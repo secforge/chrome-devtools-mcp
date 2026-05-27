@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {beforeEach, describe, it} from 'node:test';
 
-import {BrowserRegistry} from '../src/BrowserRegistry.js';
+import {BrowserRegistry, parseCommandLine} from '../src/BrowserRegistry.js';
 import type {BrowserConfig} from '../src/BrowserRegistry.js';
 import type {McpContext} from '../src/McpContext.js';
 import type {Browser} from '../src/third_party/index.js';
@@ -123,6 +123,61 @@ describe('BrowserRegistry', () => {
       entry.state = 'disconnected';
       entry.lastAttempt = Date.now() - 61_000;
       assert.strictEqual(r.canRetry(1), true);
+    });
+  });
+
+  describe('parseCommandLine', () => {
+    it('splits a simple command', () => {
+      assert.deepStrictEqual(parseCommandLine('a b c'), ['a', 'b', 'c']);
+    });
+
+    it('keeps single-quoted spans (paths with spaces) intact', () => {
+      assert.deepStrictEqual(parseCommandLine("'/a b/c.exe' --flag"), [
+        '/a b/c.exe',
+        '--flag',
+      ]);
+    });
+
+    it('concatenates adjacent unquoted and quoted segments', () => {
+      assert.deepStrictEqual(parseCommandLine("--dir='L:\\Test Dir\\x'"), [
+        '--dir=L:\\Test Dir\\x',
+      ]);
+    });
+
+    it('does NOT treat shell metacharacters as operators', () => {
+      // Without a shell these are literal argv tokens, not command chaining.
+      assert.deepStrictEqual(parseCommandLine('app; rm -rf / && echo $(x)'), [
+        'app;',
+        'rm',
+        '-rf',
+        '/',
+        '&&',
+        'echo',
+        '$(x)',
+      ]);
+    });
+
+    it('tokenizes a realistic Edge launch command', () => {
+      const cmd =
+        "'/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe' " +
+        "--user-data-dir='L:\\Development\\Tools\\Start Test Browsers\\Test 1' " +
+        '--no-first-run --window-size=1905,1050 ' +
+        '--remote-debugging-port=9281 https://127.0.0.1:3001';
+      const argv = parseCommandLine(cmd);
+      assert.strictEqual(
+        argv[0],
+        '/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+      );
+      assert.ok(
+        argv.includes(
+          '--user-data-dir=L:\\Development\\Tools\\Start Test Browsers\\Test 1',
+        ),
+      );
+      assert.strictEqual(argv.at(-1), 'https://127.0.0.1:3001');
+    });
+
+    it('throws on an unterminated quote', () => {
+      assert.throws(() => parseCommandLine("'unbalanced"), /Unterminated/);
     });
   });
 
