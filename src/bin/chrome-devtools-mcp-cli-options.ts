@@ -33,7 +33,7 @@ export const cliOptions = {
   browserUrl: {
     type: 'array',
     description:
-      'Connect to one or more running, debuggable Chrome instances. Format: `url` or `url|start-command`. The start-command is executed via shell when a reconnect is requested (e.g. using `reconnect_browser`) and the browser is not reachable. Can be specified multiple times. For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.',
+      'Connect to one or more running, debuggable Chrome instances. Format: `url` or `url|start-command`. The start-command is parsed into arguments (POSIX-style quoting) and run WITHOUT a shell when a reconnect is requested (e.g. using `reconnect_browser`) and the browser is not reachable. Can be specified multiple times. For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.',
     alias: 'u',
     conflicts: ['wsEndpoint'],
     coerce: (values: string[] | undefined): BrowserUrlConfig[] | undefined => {

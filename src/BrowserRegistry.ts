@@ -56,6 +56,80 @@ export interface BrowserEntry {
 const RETRY_COOLDOWN_MS = 60_000; // 1 minute cooldown before auto-retry
 
 /**
+ * Split a start command into an argv array using POSIX-style quoting rules
+ * (single quotes are literal; double quotes allow \\ escapes of " \\ $ `).
+ *
+ * The result is spawned WITHOUT a shell, so shell metacharacters such as
+ * `;`, `|`, `&&`, `$(...)` and backticks are treated as literal argument text
+ * and cannot chain or substitute commands. This prevents a model-triggered
+ * reconnect from escalating an operator-configured start command into
+ * arbitrary shell execution.
+ */
+export function parseCommandLine(command: string): string[] {
+  const args: string[] = [];
+  let current = '';
+  let hasToken = false;
+  let inSingle = false;
+  let inDouble = false;
+
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i];
+
+    if (inSingle) {
+      if (ch === "'") {
+        inSingle = false;
+      } else {
+        current += ch;
+      }
+      continue;
+    }
+
+    if (inDouble) {
+      if (ch === '"') {
+        inDouble = false;
+      } else if (
+        ch === '\\' &&
+        i + 1 < command.length &&
+        ['"', '\\', '$', '`'].includes(command[i + 1])
+      ) {
+        current += command[++i];
+      } else {
+        current += ch;
+      }
+      continue;
+    }
+
+    if (ch === "'") {
+      inSingle = true;
+      hasToken = true;
+    } else if (ch === '"') {
+      inDouble = true;
+      hasToken = true;
+    } else if (ch === '\\' && i + 1 < command.length) {
+      current += command[++i];
+      hasToken = true;
+    } else if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
+      if (hasToken) {
+        args.push(current);
+        current = '';
+        hasToken = false;
+      }
+    } else {
+      current += ch;
+      hasToken = true;
+    }
+  }
+
+  if (inSingle || inDouble) {
+    throw new Error('Unterminated quote in start command');
+  }
+  if (hasToken) {
+    args.push(current);
+  }
+  return args;
+}
+
+/**
  * Registry for managing multiple browser instances in parallel.
  */
 export class BrowserRegistry {
@@ -128,13 +202,22 @@ export class BrowserRegistry {
   }
 
   /**
-   * Spawn start command for a browser via shell. The command runs detached so
-   * it doesn't block and won't keep the parent alive.
+   * Spawn the operator-configured start command for a browser. The command is
+   * parsed into argv and executed WITHOUT a shell (no shell-metacharacter
+   * interpretation), detached so it doesn't block or keep the parent alive.
    */
   private spawnStartCommand(index: number, command: string): void {
-    logger?.(`Browser ${index}: Spawning start command: ${command}`);
-    const child = spawn(command, {
-      shell: true,
+    const argv = parseCommandLine(command);
+    if (argv.length === 0) {
+      logger?.(`Browser ${index}: empty start command, nothing to spawn`);
+      return;
+    }
+    const [file, ...args] = argv;
+    logger?.(
+      `Browser ${index}: Spawning start command: ${file} ${args.join(' ')}`,
+    );
+    const child = spawn(file, args, {
+      shell: false,
       detached: true,
       stdio: 'ignore',
     });
