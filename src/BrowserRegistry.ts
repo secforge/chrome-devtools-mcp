@@ -129,6 +129,71 @@ export function parseCommandLine(command: string): string[] {
   return args;
 }
 
+const URL_PLACEHOLDER = '{url}';
+const ALLOWED_START_URL_PROTOCOLS = new Set(['http:', 'https:']);
+const MAX_START_URL_LENGTH = 2048;
+
+/**
+ * Validate a (potentially model-supplied) URL before it is substituted into a
+ * start command. Only absolute http(s) URLs are allowed — this guarantees the
+ * value cannot begin with '-' (so it can never be parsed as an executable
+ * flag) and cannot use a dangerous scheme (file:, javascript:, data:,
+ * chrome:, ...). Returns the normalized URL.
+ *
+ * @throws Error if the URL is too long, unparseable, or uses a disallowed
+ * scheme.
+ */
+export function sanitizeStartUrl(url: string): string {
+  if (url.length > MAX_START_URL_LENGTH) {
+    throw new Error(
+      `url is too long (max ${MAX_START_URL_LENGTH} characters).`,
+    );
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`Invalid url "${url}": must be an absolute http(s) URL.`);
+  }
+  if (!ALLOWED_START_URL_PROTOCOLS.has(parsed.protocol)) {
+    throw new Error(
+      `Disallowed url scheme "${parsed.protocol}" in "${url}": only http and https are allowed.`,
+    );
+  }
+  return parsed.href;
+}
+
+/**
+ * Build the argv for a start command, substituting the {url} placeholder with
+ * a sanitized URL. Substitution happens AFTER tokenization, so the URL is
+ * always exactly one argv element and can never split into extra arguments or
+ * be reinterpreted as a flag.
+ *
+ * @throws Error if a url is supplied without a placeholder to receive it, or a
+ * placeholder is present without a url, or the url fails sanitization.
+ */
+export function buildStartCommandArgv(command: string, url?: string): string[] {
+  const argv = parseCommandLine(command);
+  const hasPlaceholder = argv.some(token => token.includes(URL_PLACEHOLDER));
+
+  if (url !== undefined) {
+    if (!hasPlaceholder) {
+      throw new Error(
+        `Start command has no ${URL_PLACEHOLDER} placeholder to receive the url.`,
+      );
+    }
+    const safe = sanitizeStartUrl(url);
+    return argv.map(token => token.split(URL_PLACEHOLDER).join(safe));
+  }
+
+  if (hasPlaceholder) {
+    throw new Error(
+      `This browser's start command contains a ${URL_PLACEHOLDER} placeholder; a url parameter is required to reconnect it.`,
+    );
+  }
+  return argv;
+}
+
 /**
  * Registry for managing multiple browser instances in parallel.
  */
@@ -206,8 +271,12 @@ export class BrowserRegistry {
    * parsed into argv and executed WITHOUT a shell (no shell-metacharacter
    * interpretation), detached so it doesn't block or keep the parent alive.
    */
-  private spawnStartCommand(index: number, command: string): void {
-    const argv = parseCommandLine(command);
+  private spawnStartCommand(
+    index: number,
+    command: string,
+    url?: string,
+  ): void {
+    const argv = buildStartCommandArgv(command, url);
     if (argv.length === 0) {
       logger?.(`Browser ${index}: empty start command, nothing to spawn`);
       return;
@@ -252,11 +321,14 @@ export class BrowserRegistry {
    * @param force If true, bypasses cooldown check (for manual reconnect)
    * @param runStartCommand If true and connection fails, run the configured
    * start command
+   * @param startUrl Optional sanitized-on-use URL substituted into the start
+   * command's {url} placeholder when (re)launching the browser
    */
   async connect(
     index: number,
     force = false,
     runStartCommand = false,
+    startUrl?: string,
   ): Promise<McpContext> {
     if (index < 1 || index > this.browsers.length) {
       throw new Error(
@@ -302,7 +374,7 @@ export class BrowserRegistry {
           logger?.(
             `Browser ${index}: Initial connection failed, attempting to start browser...`,
           );
-          this.spawnStartCommand(index, entry.config.startCommand);
+          this.spawnStartCommand(index, entry.config.startCommand, startUrl);
 
           // Wait for browser to start (try a few times with delays)
           const maxRetries = 5;

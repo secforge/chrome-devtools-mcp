@@ -7,7 +7,12 @@
 import assert from 'node:assert';
 import {beforeEach, describe, it} from 'node:test';
 
-import {BrowserRegistry, parseCommandLine} from '../src/BrowserRegistry.js';
+import {
+  BrowserRegistry,
+  buildStartCommandArgv,
+  parseCommandLine,
+  sanitizeStartUrl,
+} from '../src/BrowserRegistry.js';
 import type {BrowserConfig} from '../src/BrowserRegistry.js';
 import type {McpContext} from '../src/McpContext.js';
 import type {Browser} from '../src/third_party/index.js';
@@ -178,6 +183,93 @@ describe('BrowserRegistry', () => {
 
     it('throws on an unterminated quote', () => {
       assert.throws(() => parseCommandLine("'unbalanced"), /Unterminated/);
+    });
+  });
+
+  describe('sanitizeStartUrl', () => {
+    it('accepts http and https and normalizes', () => {
+      assert.strictEqual(
+        sanitizeStartUrl('https://example.com/a'),
+        'https://example.com/a',
+      );
+      assert.strictEqual(
+        sanitizeStartUrl('http://127.0.0.1:3001'),
+        'http://127.0.0.1:3001/',
+      );
+    });
+
+    it('rejects dangerous schemes', () => {
+      assert.throws(() => sanitizeStartUrl('file:///etc/passwd'), /scheme/);
+      assert.throws(() => sanitizeStartUrl('javascript:alert(1)'), /scheme/);
+      assert.throws(() => sanitizeStartUrl('data:text/html,x'), /scheme/);
+      assert.throws(() => sanitizeStartUrl('chrome://settings'), /scheme/);
+    });
+
+    it('rejects values that are not absolute URLs (incl. flag injection)', () => {
+      assert.throws(
+        () => sanitizeStartUrl('--proxy-server=http://evil'),
+        /Invalid url/,
+      );
+      assert.throws(() => sanitizeStartUrl('-foo'), /Invalid url/);
+      assert.throws(() => sanitizeStartUrl('/local/path'), /Invalid url/);
+      assert.throws(() => sanitizeStartUrl('example.com'), /Invalid url/);
+    });
+
+    it('rejects overly long URLs', () => {
+      assert.throws(
+        () => sanitizeStartUrl('https://e.com/' + 'a'.repeat(3000)),
+        /too long/,
+      );
+    });
+  });
+
+  describe('buildStartCommandArgv', () => {
+    it('substitutes {url} as a single argv element', () => {
+      const argv = buildStartCommandArgv(
+        "'/a b/edge.exe' --flag {url}",
+        'https://example.com/x',
+      );
+      assert.deepStrictEqual(argv, [
+        '/a b/edge.exe',
+        '--flag',
+        'https://example.com/x',
+      ]);
+    });
+
+    it('keeps an injected URL as ONE arg even with shell metacharacters in path', () => {
+      // The placeholder lives in its own token; the sanitized URL replaces it
+      // wholesale and cannot split or add arguments.
+      const argv = buildStartCommandArgv('edge {url}', 'https://e.com/a%20b');
+      assert.strictEqual(argv.length, 2);
+      assert.strictEqual(argv[1], 'https://e.com/a%20b');
+    });
+
+    it('throws if a url is given but there is no placeholder', () => {
+      assert.throws(
+        () => buildStartCommandArgv('edge https://fixed', 'https://x.com'),
+        /no \{url\} placeholder/,
+      );
+    });
+
+    it('throws if a placeholder is present but no url is given', () => {
+      assert.throws(
+        () => buildStartCommandArgv('edge {url}'),
+        /url parameter is required/,
+      );
+    });
+
+    it('passes through unchanged when neither url nor placeholder is present', () => {
+      assert.deepStrictEqual(buildStartCommandArgv('edge --headless'), [
+        'edge',
+        '--headless',
+      ]);
+    });
+
+    it('rejects a dangerous url before building argv', () => {
+      assert.throws(
+        () => buildStartCommandArgv('edge {url}', 'file:///etc/passwd'),
+        /scheme/,
+      );
     });
   });
 

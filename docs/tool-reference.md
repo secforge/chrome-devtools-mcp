@@ -254,6 +254,7 @@
 **Parameters:**
 
 - **browserIndex** (integer) _(optional)_: Index of the browser to reconnect (1-based). Required in multi-browser mode.
+- **url** (string) _(optional)_: Absolute http(s) URL the browser should open when it is (re)launched. Substituted into the {url} placeholder of the configured start command. Required when that start command contains a {url} placeholder. Only http and https URLs are accepted.
 
 ---
 
