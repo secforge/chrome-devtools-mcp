@@ -53,9 +53,9 @@ describe('cli args parsing', () => {
       _: [],
       headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
-      'browser-url': 'http://localhost:3000',
-      browserUrl: 'http://localhost:3000',
-      u: 'http://localhost:3000',
+      'browser-url': [{url: 'http://localhost:3000'}],
+      browserUrl: [{url: 'http://localhost:3000'}],
+      u: [{url: 'http://localhost:3000'}],
     });
   });
 
@@ -196,9 +196,9 @@ describe('cli args parsing', () => {
       _: [],
       headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
-      'ws-endpoint': 'ws://127.0.0.1:9222/devtools/browser/abc123',
-      wsEndpoint: 'ws://127.0.0.1:9222/devtools/browser/abc123',
-      w: 'ws://127.0.0.1:9222/devtools/browser/abc123',
+      'ws-endpoint': ['ws://127.0.0.1:9222/devtools/browser/abc123'],
+      wsEndpoint: ['ws://127.0.0.1:9222/devtools/browser/abc123'],
+      w: ['ws://127.0.0.1:9222/devtools/browser/abc123'],
     });
   });
 
@@ -218,9 +218,9 @@ describe('cli args parsing', () => {
       _: [],
       headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
-      'ws-endpoint': 'wss://example.com:9222/devtools/browser/abc123',
-      wsEndpoint: 'wss://example.com:9222/devtools/browser/abc123',
-      w: 'wss://example.com:9222/devtools/browser/abc123',
+      'ws-endpoint': ['wss://example.com:9222/devtools/browser/abc123'],
+      wsEndpoint: ['wss://example.com:9222/devtools/browser/abc123'],
+      w: ['wss://example.com:9222/devtools/browser/abc123'],
     });
   });
 

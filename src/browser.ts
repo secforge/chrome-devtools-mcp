@@ -52,9 +52,16 @@ export async function ensureBrowserConnected(options: {
   channel?: Channel;
   userDataDir?: string;
   enableExtensions?: boolean;
+  /**
+   * When false, never reuse or assign the module-level browser singleton.
+   * Used by the BrowserRegistry so each registered browser gets its own
+   * independent connection (multi-browser support).
+   */
+  reuseGlobal?: boolean;
 }) {
   const {channel, enableExtensions} = options;
-  if (browser?.connected) {
+  const reuseGlobal = options.reuseGlobal ?? true;
+  if (reuseGlobal && browser?.connected) {
     return browser;
   }
 
@@ -125,8 +132,12 @@ export async function ensureBrowserConnected(options: {
     // `browser` set with `browserMode` still undefined (would fall through
     // to the disconnect() path and orphan a launched Chrome).
     const connected = await puppeteer.connect(connectOptions);
-    browserMode = 'connected';
-    browser = connected;
+    if (reuseGlobal) {
+      browserMode = 'connected';
+      browser = connected;
+    }
+    logger?.('Connected Puppeteer');
+    return connected;
   } catch (err) {
     throw new Error(
       `Could not connect to Chrome. ${autoConnect ? `Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.` : `Check if Chrome is running.`}`,
@@ -135,11 +146,9 @@ export async function ensureBrowserConnected(options: {
       },
     );
   }
-  logger?.('Connected Puppeteer');
-  return browser;
 }
 
-interface McpLaunchOptions {
+export interface McpLaunchOptions {
   acceptInsecureCerts?: boolean;
   executablePath?: string;
   channel?: Channel;

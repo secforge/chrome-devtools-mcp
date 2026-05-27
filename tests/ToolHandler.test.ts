@@ -154,7 +154,7 @@ describe('ToolHandler', () => {
     assert.strictEqual(result.isError, true);
     assert.match(
       result.content[0].type === 'text' ? result.content[0].text : '',
-      /Unknown argument for tool "lenient_tool": "description"\. Expected arguments: "url"\./,
+      /Unknown argument for tool "lenient_tool": "description"\. Expected arguments: "browserIndex", "url"\./,
     );
     assert.strictEqual(handlerCalled, false);
   });
