@@ -37,6 +37,11 @@ if (process.env['CHROME_DEVTOOLS_MCP_CRASH_ON_UNCAUGHT'] !== 'true') {
 // transport to signal exit) and on standard termination signals. Without
 // this, an active Chrome subprocess keeps the Node event loop ref'd after
 // stdin closes and the server hangs until something else kills it.
+// Holder so the shutdown handlers (registered before the server is created)
+// can reach the registry once it exists.
+const lifecycle: {
+  registry?: Awaited<ReturnType<typeof createMcpServer>>['registry'];
+} = {};
 let shuttingDown = false;
 async function shutdown(reason: string): Promise<void> {
   if (shuttingDown) {
@@ -51,7 +56,9 @@ async function shutdown(reason: string): Promise<void> {
   setTimeout(() => {
     logger?.('Shutdown timeout exceeded, forcing exit');
     process.exit(0);
-  }, 5000).unref();
+  }, 10000).unref();
+  // Dispose multi-browser registry connections, then the legacy global.
+  await lifecycle.registry?.disposeAll();
   await closeBrowser();
   process.exit(0);
 }
@@ -72,9 +79,10 @@ process.on('SIGHUP', () => {
 });
 
 logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
-const {server} = await createMcpServer(args, {
+const {server, registry} = await createMcpServer(args, {
   logFile,
 });
+lifecycle.registry = registry;
 const transport = new StdioServerTransport();
 await server.connect(transport);
 logger?.('Chrome DevTools MCP Server connected');

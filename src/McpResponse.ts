@@ -447,7 +447,33 @@ export class McpResponse implements Response {
     return this.#listWebMcpTools;
   }
 
-  async #handleSnapshot(
+  /**
+   * Build a response for tools that do not operate on a browser context
+   * (e.g. list_browsers, reconnect_browser). Text and images only — no
+   * context-dependent data such as snapshots, pages or network requests.
+   */
+  async handleWithoutContext(
+    toolName: string,
+  ): Promise<Array<TextContent | ImageContent>> {
+    const lines = [`# ${toolName} response`, ...this.#textResponseLines];
+    const content: Array<TextContent | ImageContent> = [
+      {
+        type: 'text',
+        text: lines.join('\n'),
+      },
+    ];
+    for (const image of this.#images) {
+      content.push({
+        type: 'image',
+        data: image.data,
+        mimeType: image.mimeType,
+      });
+    }
+    return content;
+  }
+
+  async handle(
+    toolName: string,
     context: McpContext,
   ): Promise<SnapshotFormatter | string | undefined> {
     if (this.#includePages) {

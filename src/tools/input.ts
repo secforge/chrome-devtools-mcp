@@ -540,3 +540,52 @@ export const pressKey = definePageTool({
     }
   },
 });
+
+export const pressKeys = definePageTool({
+  name: 'press_keys',
+  description: `Press multiple keys or key combinations in sequence. Use this when you need to perform a series of key presses.`,
+  annotations: {
+    category: ToolCategory.INPUT,
+    readOnlyHint: false,
+  },
+  schema: {
+    keys: zod
+      .array(
+        zod
+          .string()
+          .describe(
+            'A key or a combination (e.g., "Enter", "Control+A", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta',
+          ),
+      )
+      .describe('An array of keys or key combinations to press in sequence'),
+    includeSnapshot: includeSnapshotSchema,
+  },
+  blockedByDialog: true,
+  verifyFilesSchema: [],
+  handler: async (request, response) => {
+    const page = request.page;
+    let lastResult: WaitForEventsResult = {};
+    for (const keyInput of request.params.keys) {
+      const tokens = parseKey(keyInput);
+      const [key, ...modifiers] = tokens;
+
+      lastResult = await page.waitForEventsAfterAction(async () => {
+        for (const modifier of modifiers) {
+          await page.pptrPage.keyboard.down(modifier);
+        }
+        await page.pptrPage.keyboard.press(key);
+        for (const modifier of modifiers.toReversed()) {
+          await page.pptrPage.keyboard.up(modifier);
+        }
+      });
+    }
+
+    response.appendResponseLine(
+      `Successfully pressed keys: ${request.params.keys.join(', ')}`,
+    );
+    response.attachWaitForResult(lastResult);
+    if (request.params.includeSnapshot) {
+      response.includeSnapshot();
+    }
+  },
+});

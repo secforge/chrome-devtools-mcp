@@ -8,9 +8,11 @@ import type fs from 'node:fs';
 
 import {type ParsedArguments} from './config/mcp-options.js';
 import type {Channel} from './browser.js';
-import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
-import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
-import {McpContext} from './McpContext.js';
+import {BrowserRegistry, type BrowserConfig} from './BrowserRegistry.js';
+import {loadIssueDescriptions} from './issue-descriptions.js';
+import {logger} from './logger.js';
+import type {McpContext} from './McpContext.js';
+import {Mutex} from './Mutex.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {FilePersistence} from './telemetry/persistence.js';
 import {
@@ -69,10 +71,8 @@ export async function createMcpServer(
     return {};
   });
 
-  // Roots are client state rather than browser state, so the last listing stays
-  // valid across browser reconnects and only the client can invalidate it, via
-  // the `roots/list_changed` notification handled below
-  let lastRoots: Root[] | undefined;
+  const registry = BrowserRegistry.getInstance();
+  let cachedRoots: Parameters<McpContext['setRoots']>[0] | undefined;
 
   // `timeout` is only passed where a tool call is waiting on the result – the
   // background refreshes below block nobody, so bounding them would just discard
@@ -87,8 +87,11 @@ export async function createMcpServer(
         ListRootsResultSchema,
         timeout === undefined ? undefined : {timeout},
       );
-      lastRoots = roots.roots;
-      context?.setRoots(lastRoots);
+      cachedRoots = roots.roots;
+      // Apply to every already-connected browser context.
+      for (const entry of registry.getAll()) {
+        entry.context?.setRoots(cachedRoots);
+      }
     } catch (e) {
       logger?.('Failed to list roots', e);
     }
@@ -117,12 +120,14 @@ export async function createMcpServer(
     }
   };
 
-  let context: McpContext;
-  async function getContext(): Promise<McpContext> {
+  /**
+   * Register browser configurations without connecting. The MCP server starts
+   * immediately and browser connections are established lazily / in the
+   * background. All browsers — including the default launched one — go through
+   * the registry so a single code path supports one or many browsers.
+   */
+  function registerBrowserConfigs(): void {
     const chromeArgs: string[] = (serverArgs.chromeArg ?? []).map(String);
-    const ignoreDefaultChromeArgs: string[] = (
-      serverArgs.ignoreDefaultChromeArg ?? []
-    ).map(String);
     if (serverArgs.proxyServer) {
       chromeArgs.push(`--proxy-server=${serverArgs.proxyServer}`);
     }
@@ -134,61 +139,87 @@ export async function createMcpServer(
       ? serverArgs.allowedUrlPattern.map(String)
       : undefined;
 
-    const browser =
-      serverArgs.browserUrl || serverArgs.wsEndpoint || serverArgs.autoConnect
-        ? await ensureBrowserConnected({
-            browserURL: serverArgs.browserUrl,
-            wsEndpoint: serverArgs.wsEndpoint,
-            wsHeaders: serverArgs.wsHeaders,
-            // Important: only pass channel, if autoConnect is true.
-            channel: serverArgs.autoConnect
-              ? (serverArgs.channel as Channel)
-              : undefined,
-            userDataDir: serverArgs.userDataDir,
-            devtools,
-            blocklist,
-            allowlist,
-          })
-        : await ensureBrowserLaunched({
-            headless: serverArgs.headless,
-            executablePath: serverArgs.executablePath,
-            channel: serverArgs.channel as Channel,
-            isolated: serverArgs.isolated ?? false,
-            userDataDir: serverArgs.userDataDir,
-            logFile: options.logFile,
-            viewport: serverArgs.viewport,
-            chromeArgs,
-            ignoreDefaultChromeArgs,
-            acceptInsecureCerts: serverArgs.acceptInsecureCerts,
-            devtools,
-            enableExtensions: serverArgs.categoryExtensions,
-            viaCli: serverArgs.viaCli,
-            blocklist,
-            allowlist,
-          });
+    const mcpContextOptions = {
+      experimentalDevToolsDebugging: devtools,
+      experimentalIncludeAllPages: serverArgs.experimentalIncludeAllPages,
+      performanceCrux: serverArgs.performanceCrux ?? false,
+      allowList: allowlist,
+      blocklist,
+    };
 
-    if (context?.browser !== browser) {
-      context?.dispose();
-      context = await McpContext.from(browser, logger, {
-        experimentalDevToolsDebugging: devtools,
-        experimentalIncludeAllPages: serverArgs.experimentalIncludeAllPages,
-        performanceCrux: serverArgs.performanceCrux,
-        allowList: allowlist,
-        blocklist: blocklist,
-        allowUnrestrictedPaths: serverArgs.allowUnrestrictedPaths,
-        // Surfaces a one-time note in the next response after a reconnect.
-        reconnected: context !== undefined,
-      });
-      if (lastRoots === undefined) {
-        // Nothing listed yet, so this call has to wait – bounded, since it is
-        // holding the tool mutex, and a later background refresh still lands
-        await updateRoots(ROOTS_REQUEST_TIMEOUT);
-      } else {
-        // Carry the known roots over and refresh out of band, so a reconnect
-        // never pays for a client round-trip
-        context.setRoots(lastRoots);
-        void updateRoots();
+    if (serverArgs.browserUrl && serverArgs.browserUrl.length > 0) {
+      for (const browserUrlConfig of serverArgs.browserUrl) {
+        const config: BrowserConfig = {
+          browserURL: browserUrlConfig.url,
+          wsHeaders: serverArgs.wsHeaders,
+          devtools,
+          mcpContextOptions,
+          startCommand: browserUrlConfig.startCommand,
+          blocklist,
+          allowlist,
+        };
+        registry.register(config, browserUrlConfig.url);
       }
+    } else if (serverArgs.wsEndpoint && serverArgs.wsEndpoint.length > 0) {
+      for (const endpoint of serverArgs.wsEndpoint) {
+        const config: BrowserConfig = {
+          wsEndpoint: endpoint,
+          wsHeaders: serverArgs.wsHeaders,
+          devtools,
+          mcpContextOptions,
+          blocklist,
+          allowlist,
+        };
+        registry.register(config, endpoint);
+      }
+    } else if (serverArgs.autoConnect) {
+      const label = serverArgs.userDataDir
+        ? `user-data-dir:${serverArgs.userDataDir}`
+        : `channel:${serverArgs.channel}`;
+      const config: BrowserConfig = {
+        channel: serverArgs.channel as Channel,
+        userDataDir: serverArgs.userDataDir,
+        devtools,
+        mcpContextOptions,
+        blocklist,
+        allowlist,
+      };
+      registry.register(config, label);
+    } else {
+      const ignoreDefaultChromeArgs: string[] = (
+        serverArgs.ignoreDefaultChromeArg ?? []
+      ).map(String);
+      const config: BrowserConfig = {
+        launchOptions: {
+          headless: serverArgs.headless,
+          executablePath: serverArgs.executablePath,
+          channel: serverArgs.channel as Channel,
+          isolated: serverArgs.isolated ?? false,
+          userDataDir: serverArgs.userDataDir,
+          logFile: options.logFile,
+          viewport: serverArgs.viewport,
+          chromeArgs,
+          ignoreDefaultChromeArgs,
+          acceptInsecureCerts: serverArgs.acceptInsecureCerts,
+          devtools,
+          enableExtensions: serverArgs.categoryExtensions,
+          viaCli: serverArgs.viaCli,
+          blocklist,
+          allowlist,
+        },
+        devtools,
+        mcpContextOptions,
+      };
+      registry.register(config, 'launched');
+    }
+    logger?.(`Registered ${registry.count()} browser(s) (connections pending)`);
+  }
+
+  async function getContext(browserIndex?: number): Promise<McpContext> {
+    const context = await registry.getContext(browserIndex);
+    if (cachedRoots) {
+      context.setRoots(cachedRoots);
+>>>>>>> 22863ed (feat: port multi-browser support, list_browsers/reconnect_browser, press_keys onto upstream main)
     }
     return context;
   }
@@ -220,6 +251,8 @@ export async function createMcpServer(
     );
   }
 
+  registerBrowserConfigs();
+
   const tools = createTools(serverArgs);
   for (const tool of tools) {
     registerTool(tool);
@@ -227,7 +260,10 @@ export async function createMcpServer(
 
   await loadIssueDescriptions();
 
-  return {server};
+  // Start browser connections in the background (fire-and-forget).
+  registry.connectAllInBackground();
+
+  return {server, registry};
 }
 
 export const logDisclaimers = (args: ParsedArguments) => {

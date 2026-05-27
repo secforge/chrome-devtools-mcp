@@ -22,7 +22,7 @@ import type {
   FileVerificationOption,
   ToolDefinition,
 } from './tools/ToolDefinition.js';
-import {pageIdSchema} from './tools/ToolDefinition.js';
+import {browserIndexSchema, pageIdSchema} from './tools/ToolDefinition.js';
 import {logger} from './utils/logger.js';
 import type {Mutex} from './third_party/index.js';
 import {fileURLToPath} from 'node:url';
@@ -224,21 +224,28 @@ export class ToolHandler {
 
   constructor(
     private readonly tool: ToolDefinition | DefinedPageTool,
-    private readonly serverArgs: ParsedArguments,
-    private readonly getContext: () => Promise<McpContext>,
+    private readonly serverArgs: ReturnType<typeof parseArguments>,
+    private readonly getContext: (browserIndex?: number) => Promise<McpContext>,
     private readonly toolMutex: Mutex,
   ) {
     const {disabled, reason} = getToolStatusInfo(tool, serverArgs);
     this.disabledReason = reason;
     this.shouldRegister = !(disabled && !serverArgs.viaCli);
 
-    this.inputSchema =
+    const baseSchema =
       'pageScoped' in tool &&
       tool.pageScoped &&
       serverArgs.experimentalPageIdRouting &&
       !serverArgs.slim
         ? {...pageIdSchema, ...tool.schema}
         : tool.schema;
+    // Inject browserIndex for every browser-scoped tool so a single browser
+    // selects implicitly and multiple browsers can be targeted explicitly.
+    // Tools that skip the browser context (list_browsers, reconnect_browser)
+    // declare their own parameters.
+    this.inputSchema = tool.annotations.skipBrowserContext
+      ? baseSchema
+      : {...browserIndexSchema, ...baseSchema};
     this.registeredInputSchema = zod.object(this.inputSchema).passthrough();
   }
 
@@ -287,7 +294,27 @@ export class ToolHandler {
       logger?.(
         `${this.tool.name} request: ${JSON.stringify(params, null, '  ')}`,
       );
-      const context = await this.getContext();
+
+      // Tools like list_browsers / reconnect_browser don't operate on a
+      // browser context; handle them via the BrowserRegistry directly.
+      if (this.tool.annotations.skipBrowserContext) {
+        const response = new McpResponse(this.serverArgs);
+        response.setRedactNetworkHeaders(this.serverArgs.redactNetworkHeaders);
+        await (this.tool as ToolDefinition).handler(
+          {params},
+          response,
+          undefined as unknown as McpContext,
+        );
+        const content = await response.handleWithoutContext(this.tool.name);
+        success = true;
+        return {content};
+      }
+
+      const browserIndex =
+        typeof params.browserIndex === 'number'
+          ? params.browserIndex
+          : undefined;
+      const context = await this.getContext(browserIndex);
       logger?.(`${this.tool.name} context: resolved`);
       const response = this.serverArgs.slim
         ? new SlimMcpResponse(this.serverArgs)

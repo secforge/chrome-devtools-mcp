@@ -7,6 +7,15 @@
 import type {YargsOptions} from '../third_party/index.js';
 import {yargs, hideBin} from '../third_party/index.js';
 
+export interface BrowserUrlConfig {
+  url: string;
+  /**
+   * Shell command executed on reconnect (e.g. via `reconnect_browser`) when
+   * the browser is not reachable.
+   */
+  startCommand?: string;
+}
+
 export const mcpOptions = {
   autoConnect: {
     type: 'boolean',
@@ -22,47 +31,67 @@ export const mcpOptions = {
     },
   },
   browserUrl: {
-    type: 'string',
+    type: 'array',
     description:
-      'Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.',
+      'Connect to one or more running, debuggable Chrome instances. Format: `url` or `url|start-command`. The start-command is executed via shell when a reconnect is requested (e.g. using `reconnect_browser`) and the browser is not reachable. Can be specified multiple times. For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.',
     alias: 'u',
     conflicts: ['wsEndpoint'],
-    coerce: (url: string | undefined) => {
-      if (!url) {
+    coerce: (values: string[] | undefined): BrowserUrlConfig[] | undefined => {
+      const nonEmpty = (values ?? []).filter(v => v && v.trim() !== '');
+      if (nonEmpty.length === 0) {
         return;
       }
-      try {
-        new URL(url);
-      } catch {
-        throw new Error(`Provided browserUrl ${url} is not valid URL.`);
-      }
-      return url;
+      return nonEmpty.map(value => {
+        // Split on first | to separate URL from optional start command.
+        const pipeIndex = value.indexOf('|');
+        let url: string;
+        let startCommand: string | undefined;
+        if (pipeIndex === -1) {
+          url = value;
+        } else {
+          url = value.substring(0, pipeIndex);
+          startCommand = value.substring(pipeIndex + 1).trim() || undefined;
+        }
+        try {
+          new URL(url);
+        } catch {
+          throw new Error(`Provided browserUrl ${url} is not valid URL.`);
+        }
+        const result: BrowserUrlConfig = {url};
+        if (startCommand) {
+          result.startCommand = startCommand;
+        }
+        return result;
+      });
     },
   },
   wsEndpoint: {
-    type: 'string',
+    type: 'array',
     description:
-      'WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Alternative to --browserUrl.',
+      'WebSocket endpoint to connect to one or more running Chrome instances (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Can be specified multiple times. Alternative to --browserUrl.',
     alias: 'w',
     conflicts: ['browserUrl'],
-    coerce: (url: string | undefined) => {
-      if (!url) {
+    coerce: (values: string[] | undefined): string[] | undefined => {
+      const nonEmpty = (values ?? []).filter(v => v && v.trim() !== '');
+      if (nonEmpty.length === 0) {
         return;
       }
-      try {
-        const parsed = new URL(url);
-        if (parsed.protocol !== 'ws:' && parsed.protocol !== 'wss:') {
-          throw new Error(
-            `Provided wsEndpoint ${url} must use ws:// or wss:// protocol.`,
-          );
+      return nonEmpty.map(url => {
+        try {
+          const parsed = new URL(url);
+          if (parsed.protocol !== 'ws:' && parsed.protocol !== 'wss:') {
+            throw new Error(
+              `Provided wsEndpoint ${url} must use ws:// or wss:// protocol.`,
+            );
+          }
+          return url;
+        } catch (error) {
+          if ((error as Error).message.includes('ws://')) {
+            throw error;
+          }
+          throw new Error(`Provided wsEndpoint ${url} is not valid URL.`);
         }
-        return url;
-      } catch (error) {
-        if ((error as Error).message.includes('ws://')) {
-          throw error;
-        }
-        throw new Error(`Provided wsEndpoint ${url} is not valid URL.`);
-      }
+      });
     },
   },
   wsHeaders: {

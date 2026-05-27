@@ -2,7 +2,7 @@
 
 # Chrome DevTools MCP Tool Reference
 
-- **[Input automation](#input-automation)** (10 tools)
+- **[Input automation](#input-automation)** (11 tools)
   - [`click`](#click)
   - [`drag`](#drag)
   - [`fill`](#fill)
@@ -10,14 +10,17 @@
   - [`handle_dialog`](#handle_dialog)
   - [`hover`](#hover)
   - [`press_key`](#press_key)
+  - [`press_keys`](#press_keys)
   - [`type_text`](#type_text)
   - [`upload_file`](#upload_file)
   - [`click_at`](#click_at)
-- **[Navigation automation](#navigation-automation)** (6 tools)
+- **[Navigation automation](#navigation-automation)** (8 tools)
   - [`close_page`](#close_page)
+  - [`list_browsers`](#list_browsers)
   - [`list_pages`](#list_pages)
   - [`navigate_page`](#navigate_page)
   - [`new_page`](#new_page)
+  - [`reconnect_browser`](#reconnect_browser)
   - [`select_page`](#select_page)
   - [`wait_for`](#wait_for)
 - **[Emulation](#emulation)** (2 tools)
@@ -152,6 +155,17 @@
 
 ---
 
+### `press_keys`
+
+**Description:** Press multiple keys or key combinations in sequence. Use this when you need to perform a series of key presses.
+
+**Parameters:**
+
+- **keys** (array) **(required)**: An array of keys or key combinations to press in sequence
+- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+
+---
+
 ### `type_text`
 
 **Description:** Type text using keyboard into a previously focused input
@@ -200,6 +214,14 @@
 
 ---
 
+### `list_browsers`
+
+**Description:** Get a list of all registered browsers and their connection states. Use this to see which browsers are available, their indices, and whether they are connected. When multiple browsers are registered, you must use the browserIndex parameter in tools to specify which browser to target.
+
+**Parameters:** None
+
+---
+
 ### `list_pages`
 
 **Description:** Get a list of pages open in the browser.
@@ -233,6 +255,16 @@
 - **background** (boolean) _(optional)_: Whether to open the page in the background without bringing it to the front. Default is false (foreground).
 - **isolatedContext** (string) _(optional)_: If specified, the page is created in an isolated browser context with the given name. Pages in the same browser context share cookies and storage. Pages in different browser contexts are fully isolated.
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
+
+---
+
+### `reconnect_browser`
+
+**Description:** Manually reconnect to a disconnected browser. Use this when a browser connection was lost or failed. In single-browser mode, no parameter needed. In multi-browser mode, specify browserIndex.
+
+**Parameters:**
+
+- **browserIndex** (integer) _(optional)_: Index of the browser to reconnect (1-based). Required in multi-browser mode.
 
 ---
 

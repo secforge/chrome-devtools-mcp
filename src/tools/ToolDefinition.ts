@@ -64,6 +64,12 @@ export interface BaseToolDefinition<
      */
     readOnlyHint: boolean;
     conditions?: string[];
+    /**
+     * If true, the tool does not require a browser context (e.g.
+     * list_browsers, reconnect_browser). The dispatcher skips resolving a
+     * browser/page and the tool uses the BrowserRegistry directly.
+     */
+    skipBrowserContext?: boolean;
   };
   schema: Schema;
   blockedByDialog: boolean;
@@ -450,6 +456,17 @@ export const CLOSE_PAGE_ERROR =
 
 export const pageIdSchema = {
   pageId: zod.number().describe('Targets a specific page by ID.'),
+};
+
+export const browserIndexSchema = {
+  browserIndex: zod
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      'Index of the browser to use (1-based). When multiple browsers are configured via --browserUrl or --wsEndpoint, this parameter is REQUIRED to specify which browser to target. When only one browser is configured, this parameter must NOT be specified. Use list_browsers to see available browser indices.',
+    ),
 };
 
 export const timeoutSchema = {
