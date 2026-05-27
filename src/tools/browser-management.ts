@@ -112,12 +112,21 @@ export const reconnectBrowser = defineTool({
       .describe(
         'Index of the browser to reconnect (1-based). Required in multi-browser mode.',
       ),
+    url: zod
+      .string()
+      .optional()
+      .describe(
+        'Absolute http(s) URL the browser should open when it is (re)launched. Substituted into the {url} placeholder of the configured start command. Required when that start command contains a {url} placeholder. Only http and https URLs are accepted.',
+      ),
   },
   verifyFilesSchema: [],
   blockedByDialog: false,
   handler: async (request, response) => {
     const registry = BrowserRegistry.getInstance();
-    const index = (request.params as {browserIndex?: number}).browserIndex;
+    const {browserIndex: index, url} = request.params as {
+      browserIndex?: number;
+      url?: string;
+    };
 
     // Validate index (same logic as getContext)
     if (registry.count() === 1) {
@@ -128,13 +137,13 @@ export const reconnectBrowser = defineTool({
       }
       // force=true bypasses cooldown, runStartCommand=true runs the start
       // command if configured.
-      await registry.connect(1, true, true);
+      await registry.connect(1, true, true, url);
       response.appendResponseLine('Browser reconnected successfully.');
     } else {
       if (index === undefined) {
         throw new Error('browserIndex is required in multi-browser mode.');
       }
-      await registry.connect(index, true, true);
+      await registry.connect(index, true, true, url);
       response.appendResponseLine(`Browser ${index} reconnected successfully.`);
     }
   },

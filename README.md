@@ -605,7 +605,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `false`
 
 - **`--browserUrl`/ `--browser-url`, `-u`**
-  Connect to one or more running, debuggable Chrome instances. Format: `url` or `url|start-command`. The start-command is executed via shell when a reconnect is requested (e.g. using `reconnect_browser`) and the browser is not reachable. Can be specified multiple times. For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.
+  Connect to one or more running, debuggable Chrome instances. Format: `url` or `url|start-command`. The start-command is parsed into arguments (POSIX-style quoting) and run WITHOUT a shell when a reconnect is requested (e.g. using `reconnect_browser`) and the browser is not reachable. It may contain a `{url}` placeholder which is replaced by the (sanitized, http/https-only) url passed to `reconnect_browser`. Can be specified multiple times. For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.
   - **Type:** array
 
 - **`--wsEndpoint`/ `--ws-endpoint`, `-w`**
