@@ -31,7 +31,11 @@ function fakeBrowser(connected = true): Browser {
 }
 
 function fakeContext(): McpContext {
-  return {} as unknown as McpContext;
+  return {
+    dispose: () => {
+      // no-op
+    },
+  } as unknown as McpContext;
 }
 
 describe('BrowserRegistry', () => {
@@ -294,6 +298,83 @@ describe('BrowserRegistry', () => {
       assert.strictEqual(disposed, 1);
       assert.strictEqual(closed, 1);
       assert.strictEqual(r.isEmpty(), true);
+    });
+  });
+
+  describe('dispose', () => {
+    it('disconnects an externally-connected browser and keeps its slot', async () => {
+      const r = BrowserRegistry.getInstance();
+      let closed = 0;
+      let disconnected = 0;
+      const browser = {
+        connected: true,
+        close: async () => {
+          closed++;
+        },
+        disconnect: async () => {
+          disconnected++;
+        },
+      } as unknown as Browser;
+      r.addConnectedBrowser(browser, fakeContext(), 'http://a');
+
+      await r.dispose(1);
+
+      // Externally connected (no launchOptions) → disconnect, never close.
+      assert.strictEqual(disconnected, 1);
+      assert.strictEqual(closed, 0);
+      // Slot preserved so indices stay stable.
+      assert.strictEqual(r.count(), 1);
+      assert.strictEqual(r.getAll()[0].state, 'disconnected');
+      assert.strictEqual(r.getAll()[0].browser, undefined);
+    });
+
+    it('closes an externally-connected browser when terminate=true', async () => {
+      const r = BrowserRegistry.getInstance();
+      let closed = 0;
+      let disconnected = 0;
+      const browser = {
+        connected: true,
+        close: async () => {
+          closed++;
+        },
+        disconnect: async () => {
+          disconnected++;
+        },
+      } as unknown as Browser;
+      r.addConnectedBrowser(browser, fakeContext(), 'http://a');
+
+      await r.dispose(1, true);
+
+      // terminate=true → always close, never disconnect, even for external browsers.
+      assert.strictEqual(closed, 1);
+      assert.strictEqual(disconnected, 0);
+      assert.strictEqual(r.getAll()[0].state, 'disconnected');
+    });
+
+    it('closes a browser that this server launched', async () => {
+      const r = BrowserRegistry.getInstance();
+      let closed = 0;
+      const browser = {
+        connected: true,
+        close: async () => {
+          closed++;
+        },
+        disconnect: async () => {
+          // no-op
+        },
+      } as unknown as Browser;
+      r.addConnectedBrowser(browser, fakeContext(), 'launched');
+      // Mark it as a browser we launched.
+      r.getAll()[0].config.launchOptions = {
+        headless: true,
+        isolated: false,
+        devtools: false,
+      };
+
+      await r.dispose(1);
+
+      assert.strictEqual(closed, 1);
+      assert.strictEqual(r.getAll()[0].state, 'disconnected');
     });
   });
 });
