@@ -39,8 +39,8 @@ function writeToolCallMetricsConfig() {
   }
 
   // Avoid 'as ParsedArguments' by using parseArguments
-  const fullTools = createTools(parseArguments('0.0.0', ['', '']));
-  const slimTools = createTools(parseArguments('0.0.0', ['', '', '--slim']));
+  const fullTools = createTools(parseArguments('0.0.0', ['', '']), 1);
+  const slimTools = createTools(parseArguments('0.0.0', ['', '', '--slim']), 1);
 
   const allTools = [...fullTools, ...slimTools];
 

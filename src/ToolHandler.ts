@@ -17,7 +17,7 @@ import {zod} from './third_party/index.js';
 import type {ToolCategory} from './tools/categories.js';
 import {labels, OFF_BY_DEFAULT_CATEGORIES} from './tools/categories.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
-import {browserIndexSchema, pageIdSchema} from './tools/ToolDefinition.js';
+import {makeBrowserIndexSchema, pageIdSchema} from './tools/ToolDefinition.js';
 
 export function buildFlag(category: ToolCategory) {
   return `category${category.charAt(0).toUpperCase() + category.slice(1)}`;
@@ -153,6 +153,7 @@ export class ToolHandler {
     private readonly serverArgs: ReturnType<typeof parseArguments>,
     private readonly getContext: (browserIndex?: number) => Promise<McpContext>,
     private readonly toolMutex: Mutex,
+    browserCount: number,
   ) {
     const {disabled, reason} = getToolStatusInfo(tool, serverArgs);
     this.disabledReason = reason;
@@ -165,13 +166,15 @@ export class ToolHandler {
       !serverArgs.slim
         ? {...pageIdSchema, ...tool.schema}
         : tool.schema;
-    // Inject browserIndex for every browser-scoped tool so a single browser
-    // selects implicitly and multiple browsers can be targeted explicitly.
-    // Tools that skip the browser context (list_browsers, reconnect_browser)
-    // declare their own parameters.
-    this.inputSchema = tool.annotations.skipBrowserContext
-      ? baseSchema
-      : {...browserIndexSchema, ...baseSchema};
+    // Inject browserIndex for browser-scoped tools ONLY when more than one
+    // browser is connected. With a single browser it selects implicitly, so the
+    // parameter is omitted entirely (the model can't pass an invalid index).
+    // Tools that skip the browser context (list_browsers, reconnect_browser,
+    // close_browser) declare their own parameters.
+    this.inputSchema =
+      tool.annotations.skipBrowserContext || browserCount <= 1
+        ? baseSchema
+        : {...makeBrowserIndexSchema(browserCount), ...baseSchema};
     this.registeredInputSchema = zod.object(this.inputSchema).passthrough();
   }
 

@@ -9,7 +9,7 @@ import type {BrowserEntry} from '../BrowserRegistry.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {defineTool, makeBrowserIndexSchema} from './ToolDefinition.js';
 
 /**
  * Format connection state for display.
@@ -36,115 +36,174 @@ function formatState(entry: BrowserEntry): string {
   }
 }
 
-export const listBrowsers = defineTool({
-  name: 'list_browsers',
-  description: `Get a list of all registered browsers and their connection states. Use this to see which browsers are available, their indices, and whether they are connected. When multiple browsers are registered, you must use the browserIndex parameter in tools to specify which browser to target.`,
-  annotations: {
-    category: ToolCategory.NAVIGATION,
-    readOnlyHint: true,
-    skipBrowserContext: true,
-  },
-  schema: {},
-  verifyFilesSchema: [],
-  blockedByDialog: false,
-  handler: async (_request, response) => {
-    const registry = BrowserRegistry.getInstance();
-    const browsers = registry.getAll();
+/**
+ * The browser-targeting schema for the skip-context tools: a `browserIndex`
+ * parameter only when more than one browser is connected, nothing otherwise.
+ */
+function browserTargetSchema(browserCount: number) {
+  return browserCount > 1 ? makeBrowserIndexSchema(browserCount) : {};
+}
 
-    if (browsers.length === 0) {
-      response.appendResponseLine('No browsers are currently registered.');
-      return;
-    }
+const startUrlSchema = zod
+  .string()
+  .optional()
+  .describe(
+    'Absolute http(s) URL the browser should open when it is (re)launched. ' +
+      'Substituted into the {url} placeholder of the configured start command. ' +
+      'Required when that start command contains a {url} placeholder. Only http ' +
+      'and https URLs are accepted.',
+  );
 
-    response.appendResponseLine(`Total browsers: ${browsers.length}\n`);
+export const listBrowsers = (_args: unknown, browserCount: number) =>
+  defineTool({
+    name: 'list_browsers',
+    description:
+      browserCount > 1
+        ? `List all connected browsers with their 1-based index, connection state and open pages. Use a browser's index as the browserIndex argument on other tools to target it.`
+        : `List the connected browser, its connection state and open pages.`,
+    annotations: {
+      category: ToolCategory.NAVIGATION,
+      readOnlyHint: true,
+      skipBrowserContext: true,
+    },
+    schema: {},
+    verifyFilesSchema: [],
+    blockedByDialog: false,
+    handler: async (_request, response) => {
+      const registry = BrowserRegistry.getInstance();
+      const browsers = registry.getAll();
 
-    for (let i = 0; i < browsers.length; i++) {
-      const entry = browsers[i];
-      response.appendResponseLine(
-        `[${i + 1}] ${entry.url} - ${formatState(entry)}`,
-      );
+      if (browsers.length === 0) {
+        response.appendResponseLine('No browsers are currently registered.');
+        return;
+      }
 
-      // List pages for connected browsers
-      if (
-        entry.state === 'connected' &&
-        entry.browser?.connected &&
-        entry.context
-      ) {
-        const pages = entry.context.getPages();
-        for (let pageIdx = 0; pageIdx < pages.length; pageIdx++) {
-          const page = pages[pageIdx];
-          const selected = entry.context.isPageSelected(page)
-            ? ' [selected]'
-            : '';
-          response.appendResponseLine(
-            `    ${pageIdx}: ${page.url()}${selected}`,
-          );
+      response.appendResponseLine(`Total browsers: ${browsers.length}\n`);
+
+      for (let i = 0; i < browsers.length; i++) {
+        const entry = browsers[i];
+        response.appendResponseLine(
+          `[${i + 1}] ${entry.url} - ${formatState(entry)}`,
+        );
+
+        // List pages for connected browsers
+        if (
+          entry.state === 'connected' &&
+          entry.browser?.connected &&
+          entry.context
+        ) {
+          const pages = entry.context.getPages();
+          for (let pageIdx = 0; pageIdx < pages.length; pageIdx++) {
+            const page = pages[pageIdx];
+            const selected = entry.context.isPageSelected(page)
+              ? ' [selected]'
+              : '';
+            response.appendResponseLine(
+              `    ${pageIdx}: ${page.url()}${selected}`,
+            );
+          }
         }
       }
-    }
 
-    if (browsers.length > 1) {
-      response.appendResponseLine(
-        `\nMultiple browsers detected. You MUST specify browserIndex parameter in all tool calls to target a specific browser.`,
-      );
-    } else {
-      response.appendResponseLine(
-        `\nSingle browser mode: browserIndex parameter must NOT be specified.`,
-      );
-    }
-  },
-});
-
-export const reconnectBrowser = defineTool({
-  name: 'reconnect_browser',
-  description: `Manually reconnect to a disconnected browser. Use this when a browser connection was lost or failed. In single-browser mode, no parameter needed. In multi-browser mode, specify browserIndex.`,
-  annotations: {
-    category: ToolCategory.NAVIGATION,
-    readOnlyHint: false,
-    skipBrowserContext: true,
-  },
-  schema: {
-    browserIndex: zod
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(
-        'Index of the browser to reconnect (1-based). Required in multi-browser mode.',
-      ),
-    url: zod
-      .string()
-      .optional()
-      .describe(
-        'Absolute http(s) URL the browser should open when it is (re)launched. Substituted into the {url} placeholder of the configured start command. Required when that start command contains a {url} placeholder. Only http and https URLs are accepted.',
-      ),
-  },
-  verifyFilesSchema: [],
-  blockedByDialog: false,
-  handler: async (request, response) => {
-    const registry = BrowserRegistry.getInstance();
-    const {browserIndex: index, url} = request.params as {
-      browserIndex?: number;
-      url?: string;
-    };
-
-    // Validate index (same logic as getContext)
-    if (registry.count() === 1) {
-      if (index !== undefined) {
-        throw new Error(
-          'browserIndex must NOT be specified in single-browser mode.',
+      if (browsers.length > 1) {
+        response.appendResponseLine(
+          `\nMultiple browsers are connected. Pass the matching browserIndex on every tool call to target a specific browser.`,
+        );
+      } else {
+        response.appendResponseLine(
+          `\nOne browser is connected; tools target it automatically (do not pass browserIndex).`,
         );
       }
-      // force=true bypasses cooldown, runStartCommand=true runs the start
-      // command if configured.
-      await registry.connect(1, true, true, url);
-      response.appendResponseLine('Browser reconnected successfully.');
-    } else {
-      if (index === undefined) {
-        throw new Error('browserIndex is required in multi-browser mode.');
+    },
+  });
+
+export const reconnectBrowser = (_args: unknown, browserCount: number) =>
+  defineTool({
+    name: 'reconnect_browser',
+    description:
+      browserCount > 1
+        ? `Reconnect a browser that is disconnected or whose connection failed, selected by browserIndex. If that browser has a start command configured it is (re)started.`
+        : `Reconnect the browser if its connection was lost or it is not running yet. If a start command is configured the browser is (re)started.`,
+    annotations: {
+      category: ToolCategory.NAVIGATION,
+      readOnlyHint: false,
+      skipBrowserContext: true,
+    },
+    schema: {
+      ...browserTargetSchema(browserCount),
+      url: startUrlSchema,
+    },
+    verifyFilesSchema: [],
+    blockedByDialog: false,
+    handler: async (request, response) => {
+      const registry = BrowserRegistry.getInstance();
+      const {browserIndex: index, url} = request.params as {
+        browserIndex?: number;
+        url?: string;
+      };
+
+      // Validate index (same logic as getContext)
+      if (registry.count() === 1) {
+        if (index !== undefined) {
+          throw new Error(
+            'browserIndex must NOT be specified when only one browser is connected.',
+          );
+        }
+        // force=true bypasses cooldown, runStartCommand=true runs the start
+        // command if configured.
+        await registry.connect(1, true, true, url);
+        response.appendResponseLine('Browser reconnected successfully.');
+      } else {
+        if (index === undefined) {
+          throw new Error(
+            'browserIndex is required when multiple browsers are connected.',
+          );
+        }
+        await registry.connect(index, true, true, url);
+        response.appendResponseLine(
+          `Browser ${index} reconnected successfully.`,
+        );
       }
-      await registry.connect(index, true, true, url);
-      response.appendResponseLine(`Browser ${index} reconnected successfully.`);
-    }
-  },
-});
+    },
+  });
+
+export const closeBrowser = (_args: unknown, browserCount: number) =>
+  defineTool({
+    name: 'close_browser',
+    description:
+      browserCount > 1
+        ? `Close a whole browser (not a single tab), selected by browserIndex. The browser window is terminated. The index is preserved, so reconnect_browser can bring it back if a start command or launch configuration is available.`
+        : `Close the whole browser (not a single tab). The browser window is terminated. reconnect_browser can bring it back if a start command or launch configuration is available.`,
+    annotations: {
+      category: ToolCategory.NAVIGATION,
+      readOnlyHint: false,
+      skipBrowserContext: true,
+    },
+    schema: {
+      ...browserTargetSchema(browserCount),
+    },
+    verifyFilesSchema: [],
+    blockedByDialog: false,
+    handler: async (request, response) => {
+      const registry = BrowserRegistry.getInstance();
+      const {browserIndex: index} = request.params as {browserIndex?: number};
+
+      if (registry.count() === 1) {
+        if (index !== undefined) {
+          throw new Error(
+            'browserIndex must NOT be specified when only one browser is connected.',
+          );
+        }
+        await registry.dispose(1, true);
+        response.appendResponseLine('Browser closed.');
+      } else {
+        if (index === undefined) {
+          throw new Error(
+            'browserIndex is required when multiple browsers are connected.',
+          );
+        }
+        await registry.dispose(index, true);
+        response.appendResponseLine(`Browser ${index} closed.`);
+      }
+    },
+  });

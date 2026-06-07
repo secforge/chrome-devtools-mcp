@@ -13,6 +13,7 @@ import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger} from './logger.js';
 import type {McpContext} from './McpContext.js';
 import {Mutex} from './Mutex.js';
+import {buildServerInstructions} from './server-instructions.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {FilePersistence} from './telemetry/persistence.js';
 import {
@@ -46,20 +47,33 @@ export async function createMcpServer(
     });
   }
 
+  const registry = BrowserRegistry.getInstance();
+  let cachedRoots: Parameters<McpContext['setRoots']>[0] | undefined;
+
+  // Register browser configurations up front (without connecting) so the
+  // server's instructions can describe the actual browsers — their indices and
+  // which ones can be (re)started via reconnect_browser.
+  registerBrowserConfigs();
+
   const server = new McpServer(
     {
       name: 'chrome_devtools',
       title: 'Chrome DevTools MCP server',
       version: VERSION,
     },
-    {capabilities: {logging: {}}},
+    {
+      capabilities: {logging: {}},
+      instructions: buildServerInstructions(
+        registry.getAll().map(entry => ({
+          url: entry.url,
+          hasStartCommand: Boolean(entry.config.startCommand),
+        })),
+      ),
+    },
   );
   server.server.setRequestHandler(SetLevelRequestSchema, () => {
     return {};
   });
-
-  const registry = BrowserRegistry.getInstance();
-  let cachedRoots: Parameters<McpContext['setRoots']>[0] | undefined;
 
   const updateRoots = async () => {
     if (!server.server.getClientCapabilities()?.roots) {
@@ -183,6 +197,9 @@ export async function createMcpServer(
   }
 
   const toolMutex = new Mutex();
+  // Fixed at startup: governs whether browser-targeting parameters and
+  // multi-browser guidance are exposed to the client at all.
+  const browserCount = registry.count();
 
   function registerTool(tool: ToolDefinition | DefinedPageTool): void {
     const toolHandler = new ToolHandler(
@@ -190,6 +207,7 @@ export async function createMcpServer(
       serverArgs,
       getContext,
       toolMutex,
+      browserCount,
     );
 
     if (!toolHandler.shouldRegister) {
@@ -209,9 +227,7 @@ export async function createMcpServer(
     );
   }
 
-  registerBrowserConfigs();
-
-  const tools = createTools(serverArgs);
+  const tools = createTools(serverArgs, browserCount);
   for (const tool of tools) {
     registerTool(tool);
   }

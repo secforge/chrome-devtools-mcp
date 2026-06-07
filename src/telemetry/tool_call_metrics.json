@@ -747,5 +747,35 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "close_browser",
+    "args": []
+  },
+  {
+    "name": "list_browsers",
+    "args": []
+  },
+  {
+    "name": "press_keys",
+    "args": [
+      {
+        "name": "keys_count",
+        "argType": "number"
+      },
+      {
+        "name": "include_snapshot",
+        "argType": "boolean"
+      }
+    ]
+  },
+  {
+    "name": "reconnect_browser",
+    "args": [
+      {
+        "name": "url_length",
+        "argType": "number"
+      }
+    ]
   }
 ]

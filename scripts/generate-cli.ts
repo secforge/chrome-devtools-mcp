@@ -108,7 +108,7 @@ function schemaToCLIOptions(schema: JsonSchema): CliOption[] {
 async function generateCli() {
   const tools = await fetchTools();
 
-  const staticTools = createTools(parseArguments());
+  const staticTools = createTools(parseArguments(), 1);
   const toolNameToCategoryEnum = new Map<string, string>();
   const toolNameToConditions = new Map<string, string[]>();
 

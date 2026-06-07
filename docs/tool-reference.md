@@ -14,7 +14,8 @@
   - [`type_text`](#type_text)
   - [`upload_file`](#upload_file)
   - [`click_at`](#click_at)
-- **[Navigation automation](#navigation-automation)** (8 tools)
+- **[Navigation automation](#navigation-automation)** (9 tools)
+  - [`close_browser`](#close_browser)
   - [`close_page`](#close_page)
   - [`list_browsers`](#list_browsers)
   - [`list_pages`](#list_pages)
@@ -193,6 +194,14 @@
 
 ## Navigation automation
 
+### `close_browser`
+
+**Description:** Close the whole browser (not a single tab). A browser launched by this server is terminated; an externally-connected browser is only disconnected. [`reconnect_browser`](#reconnect_browser) can bring it back if a start command or launch configuration is available.
+
+**Parameters:** None
+
+---
+
 ### `close_page`
 
 **Description:** Closes the page by its index. The last open page cannot be closed.
@@ -205,7 +214,7 @@
 
 ### `list_browsers`
 
-**Description:** Get a list of all registered browsers and their connection states. Use this to see which browsers are available, their indices, and whether they are connected. When multiple browsers are registered, you must use the browserIndex parameter in tools to specify which browser to target.
+**Description:** List the connected browser, its connection state and open pages.
 
 **Parameters:** None
 
@@ -249,11 +258,10 @@
 
 ### `reconnect_browser`
 
-**Description:** Manually reconnect to a disconnected browser. Use this when a browser connection was lost or failed. In single-browser mode, no parameter needed. In multi-browser mode, specify browserIndex.
+**Description:** Reconnect the browser if its connection was lost or it is not running yet. If a start command is configured the browser is (re)started.
 
 **Parameters:**
 
-- **browserIndex** (integer) _(optional)_: Index of the browser to reconnect (1-based). Required in multi-browser mode.
 - **url** (string) _(optional)_: Absolute http(s) URL the browser should open when it is (re)launched. Substituted into the {url} placeholder of the configured start command. Required when that start command contains a {url} placeholder. Only http and https URLs are accepted.
 
 ---

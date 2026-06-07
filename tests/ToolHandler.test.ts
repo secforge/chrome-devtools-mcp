@@ -21,6 +21,12 @@ import type {
   ToolDefinition,
 } from '../src/tools/ToolDefinition.js';
 
+function serverArgs() {
+  return parseArguments('1.0.0', ['node', 'script.js'], {
+    CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+  });
+}
+
 describe('ToolHandler', () => {
   afterEach(() => {
     sinon.restore();
@@ -50,15 +56,13 @@ describe('ToolHandler', () => {
     mockContext.detectOpenDevToolsWindows.resolves();
 
     const toolMutex = new Mutex();
-    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    });
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      serverArgs(),
       async () => mockContext,
       toolMutex,
+      1,
     );
 
     assert.strictEqual(toolHandler.shouldRegister, true);
@@ -89,15 +93,13 @@ describe('ToolHandler', () => {
     mockContext.detectOpenDevToolsWindows.resolves();
 
     const toolMutex = new Mutex();
-    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    });
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      serverArgs(),
       async () => mockContext,
       toolMutex,
+      1,
     );
 
     assert.strictEqual(toolHandler.shouldRegister, true);
@@ -109,8 +111,53 @@ describe('ToolHandler', () => {
     assert.strictEqual(result.isError, undefined);
   });
 
-  it('reports unknown registered tool arguments clearly', async () => {
-    let handlerCalled = false;
+  describe('browserIndex injection', () => {
+    const browserScopedTool: ToolDefinition = {
+      name: 'browser_scoped',
+      description: 'A browser-scoped tool',
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: true,
+      },
+      schema: {},
+      blockedByDialog: false,
+      verifyFilesSchema: [],
+      handler: async () => {
+        // no-op test handler
+      },
+    };
+
+    function handlerFor(browserCount: number) {
+      const mockContext = sinon.createStubInstance(McpContext);
+      return new ToolHandler(
+        browserScopedTool,
+        serverArgs(),
+        async () => mockContext,
+        new Mutex(),
+        browserCount,
+      );
+    }
+
+    it('injects browserIndex when multiple browsers are connected', () => {
+      const handler = handlerFor(2);
+      assert.ok(
+        !handler
+          .unknownArgumentNames({browserIndex: 1})
+          .includes('browserIndex'),
+      );
+    });
+
+    it('omits browserIndex when a single browser is connected', () => {
+      const handler = handlerFor(1);
+      assert.ok(
+        handler
+          .unknownArgumentNames({browserIndex: 1})
+          .includes('browserIndex'),
+      );
+    });
+  });
+
+  it('reports unknown arguments without browserIndex for a single browser', async () => {
     const tool: ToolDefinition = {
       name: 'lenient_tool',
       description: 'A tool with a required argument',
@@ -124,31 +171,61 @@ describe('ToolHandler', () => {
       blockedByDialog: false,
       verifyFilesSchema: [],
       handler: async () => {
-        handlerCalled = true;
+        // no-op test handler
       },
     };
 
     const mockContext = sinon.createStubInstance(McpContext);
     mockContext.detectOpenDevToolsWindows.resolves();
 
-    const toolMutex = new Mutex();
-    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    });
-
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      serverArgs(),
       async () => mockContext,
-      toolMutex,
+      new Mutex(),
+      1,
     );
 
     const params = {url: 'https://example.com', description: 'open the page'};
-    assert.strictEqual(
-      toolHandler.registeredInputSchema.safeParse(params).success,
-      true,
+    const result = await toolHandler.handle(params);
+
+    assert.strictEqual(result.isError, true);
+    assert.match(
+      result.content[0].type === 'text' ? result.content[0].text : '',
+      /Unknown argument for tool "lenient_tool": "description"\. Expected arguments: "url"\./,
+    );
+  });
+
+  it('reports unknown arguments including browserIndex for multiple browsers', async () => {
+    const tool: ToolDefinition = {
+      name: 'lenient_tool',
+      description: 'A tool with a required argument',
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: true,
+      },
+      schema: {
+        url: zod.string(),
+      },
+      blockedByDialog: false,
+      verifyFilesSchema: [],
+      handler: async () => {
+        // no-op test handler
+      },
+    };
+
+    const mockContext = sinon.createStubInstance(McpContext);
+    mockContext.detectOpenDevToolsWindows.resolves();
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs(),
+      async () => mockContext,
+      new Mutex(),
+      3,
     );
 
+    const params = {url: 'https://example.com', description: 'open the page'};
     const result = await toolHandler.handle(params);
 
     assert.strictEqual(result.isError, true);
@@ -156,7 +233,6 @@ describe('ToolHandler', () => {
       result.content[0].type === 'text' ? result.content[0].text : '',
       /Unknown argument for tool "lenient_tool": "description"\. Expected arguments: "browserIndex", "url"\./,
     );
-    assert.strictEqual(handlerCalled, false);
   });
 
   it('sets shouldRegister to false and returns disabled reason when category is disabled', async () => {
@@ -178,7 +254,7 @@ describe('ToolHandler', () => {
 
     const mockContext = sinon.createStubInstance(McpContext);
     const toolMutex = new Mutex();
-    const serverArgs = parseArguments(
+    const args = parseArguments(
       '1.0.0',
       ['node', 'script.js', '--categoryEmulation=false'],
       {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
@@ -186,9 +262,10 @@ describe('ToolHandler', () => {
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      args,
       async () => mockContext,
       toolMutex,
+      1,
     );
 
     assert.strictEqual(toolHandler.shouldRegister, false);

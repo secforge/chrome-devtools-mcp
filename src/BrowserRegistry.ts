@@ -426,7 +426,9 @@ export class BrowserRegistry {
     } catch (error) {
       entry.state = 'disconnected';
       entry.lastError = error as Error;
-      logger?.(`Browser ${index} connection failed: ${(error as Error).message}`);
+      logger?.(
+        `Browser ${index} connection failed: ${(error as Error).message}`,
+      );
       throw new Error(
         `Failed to connect to browser ${index}: ${(error as Error).message}`,
       );
@@ -546,7 +548,9 @@ export class BrowserRegistry {
 
     const context = await this.ensureConnected(index);
     const entry = this.get(index);
-    logger?.(`getContext(${index}) returning context for browser: ${entry.url}`);
+    logger?.(
+      `getContext(${index}) returning context for browser: ${entry.url}`,
+    );
     return context;
   }
 
@@ -576,6 +580,48 @@ export class BrowserRegistry {
    */
   hasMultipleBrowsers(): boolean {
     return this.browsers.length > 1;
+  }
+
+  /**
+   * Tear down a single browser by index while keeping its registry slot (so
+   * the 1-based indices of the other browsers stay stable). Browsers we
+   * launched are closed; browsers provided externally (browserURL/wsEndpoint)
+   * are only disconnected so we never kill a browser the user started. The
+   * entry is left in the `disconnected` state and can be brought back with
+   * `reconnect_browser` if a start command or launch configuration exists.
+   */
+  async dispose(index: number, terminate = false): Promise<void> {
+    const entry = this.get(index);
+    // Tear down context and browser independently so a failure in one does not
+    // leak the other, and always reset the slot's state afterwards.
+    try {
+      entry.context?.dispose();
+    } catch (error) {
+      logger?.(
+        `Error disposing context for browser ${index}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    try {
+      if (entry.browser?.connected) {
+        // terminate=true (explicit close_browser call) or launchOptions (we own
+        // the process) → send Browser.close via CDP to terminate the window.
+        // Otherwise just disconnect the DevTools session and leave the browser up.
+        if (terminate || entry.config.launchOptions) {
+          await entry.browser.close();
+        } else {
+          await entry.browser.disconnect();
+        }
+      }
+    } catch (error) {
+      logger?.(
+        `Error closing browser ${index}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    entry.browser = undefined;
+    entry.context = undefined;
+    entry.state = 'disconnected';
+    entry.lastError = undefined;
+    entry.lastAttempt = undefined;
   }
 
   /**
