@@ -232,7 +232,7 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
-      verifyFilesSchema: [],
+      verifyFilesSchema: {},
       handler: async () => {
         // no-op test handler
       },
@@ -318,14 +318,13 @@ describe('ToolHandler', () => {
         url: zod.string(),
       },
       blockedByDialog: false,
-      verifyFilesSchema: [],
+      verifyFilesSchema: {},
       handler: async () => {
         // no-op test handler
       },
     };
 
     const mockContext = sinon.createStubInstance(McpContext);
-    mockContext.detectOpenDevToolsWindows.resolves();
 
     const toolHandler = new ToolHandler(
       tool,

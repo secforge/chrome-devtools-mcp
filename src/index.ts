@@ -9,7 +9,7 @@ import type fs from 'node:fs';
 import {type ParsedArguments} from './config/mcp-options.js';
 import type {Channel} from './browser.js';
 import {BrowserRegistry, type BrowserConfig} from './BrowserRegistry.js';
-import {loadIssueDescriptions} from './issue-descriptions.js';
+import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
 import type {McpContext} from './McpContext.js';
 import {buildServerInstructions} from './server-instructions.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';

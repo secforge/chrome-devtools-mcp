@@ -12,9 +12,9 @@ import {
   launch,
   type McpLaunchOptions,
 } from './browser.js';
-import {logger} from './logger.js';
 import {McpContext} from './McpContext.js';
-import {Mutex} from './Mutex.js';
+import {Mutex} from './third_party/index.js';
+import {logger} from './utils/logger.js';
 import type {Browser} from './third_party/index.js';
 
 export type ConnectionState =
@@ -437,7 +437,7 @@ export class BrowserRegistry {
         `Failed to connect to browser ${index}: ${(error as Error).message}`,
       );
     } finally {
-      guard.dispose();
+      guard[Symbol.dispose]();
     }
   }
 

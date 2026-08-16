@@ -224,10 +224,10 @@ export class ToolHandler {
 
   constructor(
     private readonly tool: ToolDefinition | DefinedPageTool,
-    private readonly serverArgs: ReturnType<typeof parseArguments>,
+    private readonly serverArgs: ParsedArguments,
     private readonly getContext: (browserIndex?: number) => Promise<McpContext>,
     private readonly toolMutex: Mutex,
-    browserCount: number,
+    browserCount: number = 1,
   ) {
     const {disabled, reason} = getToolStatusInfo(tool, serverArgs);
     this.disabledReason = reason;

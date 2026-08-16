@@ -472,8 +472,7 @@ export class McpResponse implements Response {
     return content;
   }
 
-  async handle(
-    toolName: string,
+  async #handleSnapshot(
     context: McpContext,
   ): Promise<SnapshotFormatter | string | undefined> {
     if (this.#includePages) {
