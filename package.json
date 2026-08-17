@@ -1,6 +1,6 @@
 {
   "name": "@secforge/chrome-devtools-mcp",
-  "version": "1.7.0",
+  "version": "1.7.0-secforge",
   "description": "MCP server for Chrome DevTools",
   "type": "module",
   "publishConfig": {
