@@ -27,9 +27,12 @@
   - [`performance_analyze_insight`](#performance_analyze_insight)
   - [`performance_start_trace`](#performance_start_trace)
   - [`performance_stop_trace`](#performance_stop_trace)
-- **[Network](#network)** (2 tools)
+- **[Network](#network)** (5 tools)
+  - [`clear_cookies`](#clear_cookies)
+  - [`get_cookies`](#get_cookies)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
+  - [`set_cookie`](#set_cookie)
 - **[Debugging](#debugging)** (9 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
@@ -344,6 +347,31 @@
 
 ## Network
 
+### `clear_cookies`
+
+**Description:** Deletes cookies from the browser. Pass 'name' and/or 'domain' to delete matching cookies, or 'all' to clear every cookie in the browser. Use this to return to a signed-out or first-visit state.
+
+**Parameters:**
+
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+- **all** (boolean) _(optional)_: Set to true to delete EVERY cookie in the browser. This signs the user out of every site, so it is required when no other filter is given, to make a full wipe explicit.
+- **domain** (string) _(optional)_: Only delete cookies for this domain and its subdomains, e.g. "example.com" also matches "www.example.com" but not "notexample.com" (case-insensitive).
+- **name** (string) _(optional)_: Only delete cookies with this exact name.
+
+---
+
+### `get_cookies`
+
+**Description:** Gets all cookies stored in the browser's default context and writes them, including their values, to a JSON file. The tool reports only which cookies were found (name, domain, and security metadata); cookie values are never returned inline and only exist in the file.
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: The absolute or relative path to a .json file to write the cookies (including their values) to.
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+- **domain** (string) _(optional)_: Only return cookies for this domain and its subdomains, e.g. "example.com" also matches "www.example.com" (case-insensitive). When omitted, returns all cookies.
+
+---
+
 ### `get_network_request`
 
 **Description:** Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel. Useful for inspecting request headers (including 'Cookie') and response headers (including 'Set-Cookie' and directives).
@@ -368,6 +396,25 @@
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
 - **pageSize** (integer) _(optional)_: Maximum number of requests to return. When omitted, returns all requests.
 - **resourceTypes** (array) _(optional)_: Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.
+
+---
+
+### `set_cookie`
+
+**Description:** Sets a cookie in the browser. Either 'url' or 'domain' must be given. Use this to restore a session, toggle a feature flag, or reproduce a state that depends on a specific cookie.
+
+**Parameters:**
+
+- **name** (string) **(required)**: The name of the cookie.
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+- **value** (string) **(required)**: The value of the cookie. A cookie value is often a session token, and this parameter is recorded in the conversation transcript, so prefer a placeholder. May contain `{{secret:NAME}}`, which is replaced with the contents of ~/.local/share/chrome-devtools-mcp/secrets/NAME by this MCP server just before the input is sent to the browser, so the secret never has to be passed to this tool. Stage such files by reference (e.g. `pass show x > ~/.local/share/chrome-devtools-mcp/secrets/x`), never by writing the literal value. The secret file is DELETED once the call succeeds; append `:keep` (`{{secret:NAME:keep}}`) to keep it for later calls. Append `:raw` (`{{secret:NAME:raw}}`, `{{secret:NAME:raw:keep}}`) to keep a trailing newline. The directory can be relocated with the CHROME_DEVTOOLS_MCP_SECRETS_DIR environment variable. ALWAYS pick a unique, specific NAME (e.g. "github-login-7f3a" rather than "pw"): ~/.local/share/chrome-devtools-mcp/secrets is shared by all MCP servers running in parallel, so a generic name can be overwritten by another session and make you [`fill`](#fill) the wrong value, or be deleted while you still need it.
+- **domain** (string) _(optional)_: The cookie domain, e.g. "example.com" or ".example.com" to include subdomains. Either this or "url" is required.
+- **expires** (number) _(optional)_: Expiry as seconds since the UNIX epoch. Omit to create a session cookie that is dropped when the browser closes.
+- **httpOnly** (boolean) _(optional)_: Whether the cookie is inaccessible to JavaScript.
+- **path** (string) _(optional)_: The cookie path. Defaults to "/" when a domain is given.
+- **sameSite** (enum: "Strict", "Lax", "None") _(optional)_: The SameSite policy. "None" requires secure to be true.
+- **secure** (boolean) _(optional)_: Whether the cookie is only sent over HTTPS.
+- **url** (string) _(optional)_: The request URI to associate the cookie with, which sets its domain and path. Either this or "domain" is required.
 
 ---
 
