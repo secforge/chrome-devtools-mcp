@@ -67,7 +67,7 @@ export const listBrowsers = (_args: unknown, browserCount: number) =>
       skipBrowserContext: true,
     },
     schema: {},
-    verifyFilesSchema: [],
+    verifyFilesSchema: {},
     blockedByDialog: false,
     handler: async (_request, response) => {
       const registry = BrowserRegistry.getInstance();
@@ -99,7 +99,7 @@ export const listBrowsers = (_args: unknown, browserCount: number) =>
               ? ' [selected]'
               : '';
             response.appendResponseLine(
-              `    ${pageIdx}: ${page.url()}${selected}`,
+              `    ${pageIdx}: ${page.pptrPage.url()}${selected}`,
             );
           }
         }
@@ -133,7 +133,7 @@ export const reconnectBrowser = (_args: unknown, browserCount: number) =>
       ...browserTargetSchema(browserCount),
       url: startUrlSchema,
     },
-    verifyFilesSchema: [],
+    verifyFilesSchema: {},
     blockedByDialog: false,
     handler: async (request, response) => {
       const registry = BrowserRegistry.getInstance();
@@ -182,7 +182,7 @@ export const closeBrowser = (_args: unknown, browserCount: number) =>
     schema: {
       ...browserTargetSchema(browserCount),
     },
-    verifyFilesSchema: [],
+    verifyFilesSchema: {},
     blockedByDialog: false,
     handler: async (request, response) => {
       const registry = BrowserRegistry.getInstance();

@@ -561,7 +561,7 @@ export const pressKeys = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
     let lastResult: WaitForEventsResult = {};
