@@ -549,7 +549,8 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`performance_analyze_insight`](docs/tool-reference.md#performance_analyze_insight)
   - [`performance_start_trace`](docs/tool-reference.md#performance_start_trace)
   - [`performance_stop_trace`](docs/tool-reference.md#performance_stop_trace)
-- **Network** (2 tools)
+- **Network** (3 tools)
+  - [`get_cookies`](docs/tool-reference.md#get_cookies)
   - [`get_network_request`](docs/tool-reference.md#get_network_request)
   - [`list_network_requests`](docs/tool-reference.md#list_network_requests)
 - **Debugging** (8 tools)
@@ -608,10 +609,12 @@ The Chrome DevTools MCP server supports the following configuration option:
 - **`--browserUrl`/ `--browser-url`, `-u`**
   Connect to one or more running, debuggable Chrome instances. Format: `url` or `url|start-command`. The start-command is parsed into arguments (POSIX-style quoting) and run WITHOUT a shell when a reconnect is requested (e.g. using `reconnect_browser`) and the browser is not reachable. It may contain a `{url}` placeholder which is replaced by the (sanitized, http/https-only) url passed to `reconnect_browser`. Can be specified multiple times. For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.
   - **Type:** array
+  - **Default:** `false`
 
 - **`--wsEndpoint`/ `--ws-endpoint`, `-w`**
   WebSocket endpoint to connect to one or more running Chrome instances (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Can be specified multiple times. Alternative to --browserUrl.
   - **Type:** array
+  - **Default:** `false`
 
 - **`--wsHeaders`/ `--ws-headers`**
   Custom headers for WebSocket connection in JSON format (e.g., '{"Authorization":"Bearer token"}'). Only works with --wsEndpoint.

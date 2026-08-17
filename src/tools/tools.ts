@@ -8,6 +8,7 @@ import type {ParsedArguments} from '../config/mcp-options.js';
 
 import * as browserManagementTools from './browser-management.js';
 import * as consoleTools from './console.js';
+import * as cookieTools from './cookies.js';
 import * as emulationTools from './emulation.js';
 import * as extensionTools from './extensions.js';
 import * as inputTools from './input.js';
@@ -32,6 +33,7 @@ export const createTools = (args: ParsedArguments, browserCount: number) => {
     : [
         ...Object.values(browserManagementTools),
         ...Object.values(consoleTools),
+        ...Object.values(cookieTools),
         ...Object.values(emulationTools),
         ...Object.values(extensionTools),
         ...Object.values(inputTools),

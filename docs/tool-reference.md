@@ -31,7 +31,8 @@
   - [`performance_analyze_insight`](#performance_analyze_insight)
   - [`performance_start_trace`](#performance_start_trace)
   - [`performance_stop_trace`](#performance_stop_trace)
-- **[Network](#network)** (2 tools)
+- **[Network](#network)** (3 tools)
+  - [`get_cookies`](#get_cookies)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
 - **[Debugging](#debugging)** (8 tools)
@@ -207,7 +208,7 @@
 
 ### `close_browser`
 
-**Description:** Close the whole browser (not a single tab). A browser launched by this server is terminated; an externally-connected browser is only disconnected. [`reconnect_browser`](#reconnect_browser) can bring it back if a start command or launch configuration is available.
+**Description:** Close the whole browser (not a single tab). The browser window is terminated. [`reconnect_browser`](#reconnect_browser) can bring it back if a start command or launch configuration is available.
 
 **Parameters:** None
 
@@ -365,6 +366,17 @@
 
 ## Network
 
+### `get_cookies`
+
+**Description:** Gets all cookies stored in the browser's default context and writes them, including their values, to a JSON file. The tool reports only which cookies were found (name, domain, and security metadata); cookie values are never returned inline and only exist in the file.
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: The absolute or relative path to a .json file to write the cookies (including their values) to.
+- **domain** (string) _(optional)_: Only return cookies whose domain contains this string (case-insensitive). When omitted, returns all cookies.
+
+---
+
 ### `get_network_request`
 
 **Description:** Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.
@@ -399,8 +411,8 @@
 **Parameters:**
 
 - **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
-  Example without arguments: `() => document.title` or `async () => await fetch("example.com")`.
-  Example with arguments: `(el) => el.innerText`
+Example without arguments: `() => document.title` or `async () => await fetch("example.com")`.
+Example with arguments: `(el) => el.innerText`
 
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
 - **dialogAction** (string) _(optional)_: Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.
