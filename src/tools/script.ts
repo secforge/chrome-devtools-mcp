@@ -9,6 +9,11 @@ import {pathToFileURL} from 'node:url';
 import type {ParsedArguments} from '../config/ConfigParser.js';
 import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page, WebWorker} from '../third_party/index.js';
+import {
+  deleteSecrets,
+  placeholderHint,
+  resolvePlaceholders,
+} from '../utils/secrets.js';
 
 import {ToolCategory} from './categories.js';
 import type {Context, Response} from './ToolDefinition.js';
@@ -45,6 +50,8 @@ export const evaluateScript = defineTool((cliArgs: ParsedArguments) => {
           `JavaScript source to execute in the target page. Provide either this or sourcePath, but not both. The source is interpreted according to format.
 Example without arguments: \`() => document.title\` or \`async () => await fetch("example.com")\`.
 Example with arguments: \`(el) => el.innerText\`
+${placeholderHint}
+A file given as 'sourcePath' may contain the same placeholders; they are resolved after the file is read.
 `,
         ),
       sourcePath: zod
@@ -116,7 +123,15 @@ Example with arguments: \`(el) => el.innerText\`
         waitForStableDom,
       } = request.params;
 
-      const source = await resolveScriptSource(fnString, sourcePath, context);
+      const rawSource = await resolveScriptSource(
+        fnString,
+        sourcePath,
+        context,
+      );
+      // Resolved after the source is loaded, so a file read via sourcePath may
+      // carry placeholders too; the plaintext never has to reach this tool.
+      const secret = await resolvePlaceholders(rawSource);
+      const source = secret.value;
       if (format === 'script' && uidArgs && uidArgs.length > 0) {
         throw new Error('args cannot be used when format is "script".');
       }
@@ -144,6 +159,7 @@ Example with arguments: \`(el) => el.innerText\`
             // Service workers cannot interact with the DOM, so never wait for it.
             {handleDialog: dialogAction ?? 'accept', waitForStableDom: false},
           );
+        await deleteSecrets(secret.consume);
         if (result.dialogHandled) {
           context.getSelectedMcpPage().clearDialog();
         }
@@ -184,6 +200,7 @@ Example with arguments: \`(el) => el.innerText\`
         },
         {handleDialog: dialogAction ?? 'accept', waitForStableDom},
       );
+      await deleteSecrets(secret.consume);
       response.attachWaitForResult(result);
     },
   };
