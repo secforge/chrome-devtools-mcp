@@ -6,6 +6,7 @@
 
 import type {ParsedArguments} from '../config/mcp-options.js';
 
+import * as browserManagementTools from './browser-management.js';
 import * as commentsTools from './comments.js';
 import * as consoleTools from './console.js';
 import * as cookieTools from './cookies.js';
@@ -28,10 +29,11 @@ import * as thirdPartyDeveloperTools from './thirdPartyDeveloper.js';
 import type {ToolDefinition} from './ToolDefinition.js';
 import * as webmcpTools from './webmcp.js';
 
-export const createTools = (args: ParsedArguments) => {
+export const createTools = (args: ParsedArguments, browserCount: number) => {
   const rawTools = args.slim
     ? Object.values(slimTools)
     : [
+        ...Object.values(browserManagementTools),
         ...(args.devtoolsComments ? Object.values(commentsTools) : []),
         ...Object.values(consoleTools),
         ...Object.values(cookieTools),
@@ -56,7 +58,11 @@ export const createTools = (args: ParsedArguments) => {
   const tools = [];
   for (const tool of rawTools) {
     if (typeof tool === 'function') {
-      tools.push(tool(args) as unknown as ToolDefinition);
+      const factory = tool as (
+        args: ParsedArguments,
+        browserCount: number,
+      ) => ToolDefinition;
+      tools.push(factory(args, browserCount) as unknown as ToolDefinition);
     } else {
       tools.push(tool as ToolDefinition);
     }

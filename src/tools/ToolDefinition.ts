@@ -67,6 +67,12 @@ export interface BaseToolDefinition<
      */
     readOnlyHint: boolean;
     conditions?: string[];
+    /**
+     * If true, the tool does not require a browser context (e.g.
+     * list_browsers, reconnect_browser). The dispatcher skips resolving a
+     * browser/page and the tool uses the BrowserRegistry directly.
+     */
+    skipBrowserContext?: boolean;
   };
   schema: Schema;
   blockedByDialog: boolean;
@@ -473,6 +479,27 @@ export const CLOSE_PAGE_ERROR =
 export const pageIdSchema = {
   pageId: zod.number().describe('Targets a specific page by ID.'),
 };
+
+/**
+ * Build the `browserIndex` schema for a server that exposes `browserCount`
+ * browsers. This is only ever added to a tool when more than one browser is
+ * connected, so the description never has to talk about the single-browser
+ * case — it just states the valid range.
+ */
+export function makeBrowserIndexSchema(browserCount: number) {
+  return {
+    browserIndex: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        `1-based index of the browser to act on (valid: 1 to ${browserCount}). ` +
+          `Required because several browsers are connected. Use list_browsers to ` +
+          `see the browsers and their open pages.`,
+      ),
+  };
+}
 
 export const timeoutSchema = {
   timeout: zod

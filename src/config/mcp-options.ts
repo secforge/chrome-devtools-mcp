@@ -14,9 +14,55 @@ export const DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()];
 import {getCategoryOptions} from './category-options.js';
 import {getBrowserOptions} from './browser-options.js';
 
+export interface BrowserUrlConfig {
+  url: string;
+  /**
+   * Shell command executed on reconnect (e.g. via `reconnect_browser`) when
+   * the browser is not reachable.
+   */
+  startCommand?: string;
+}
+
 export const mcpOptions = {
   ...getCategoryOptions(),
   ...getBrowserOptions(),
+  // Overrides the upstream single-URL option: the fork accepts several
+  // browsers, each with an optional start command used by reconnect_browser.
+  browserUrl: {
+    type: 'array',
+    description:
+      'Connect to one or more running, debuggable Chrome instances. Format: `url` or `url|start-command`. The start-command is parsed into arguments (POSIX-style quoting) and run WITHOUT a shell when a reconnect is requested (e.g. using `reconnect_browser`) and the browser is not reachable. It may contain a `{url}` placeholder which is replaced by the (sanitized, http/https-only) url passed to `reconnect_browser`. Can be specified multiple times. For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.',
+    alias: 'u',
+    conflicts: ['wsEndpoint'],
+    coerce: (values: string[] | undefined): BrowserUrlConfig[] | undefined => {
+      const nonEmpty = (values ?? []).filter(v => v && v.trim() !== '');
+      if (nonEmpty.length === 0) {
+        return;
+      }
+      return nonEmpty.map(value => {
+        // Split on first | to separate URL from optional start command.
+        const pipeIndex = value.indexOf('|');
+        let url: string;
+        let startCommand: string | undefined;
+        if (pipeIndex === -1) {
+          url = value;
+        } else {
+          url = value.substring(0, pipeIndex);
+          startCommand = value.substring(pipeIndex + 1).trim() || undefined;
+        }
+        try {
+          new URL(url);
+        } catch {
+          throw new Error(`Provided browserUrl ${url} is not valid URL.`);
+        }
+        const result: BrowserUrlConfig = {url};
+        if (startCommand) {
+          result.startCommand = startCommand;
+        }
+        return result;
+      });
+    },
+  },
   logFile: {
     type: 'string',
     describe:

@@ -40,8 +40,8 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `false`
 
 - **`--browserUrl`/ `--browser-url`, `-u`**
-  Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/advanced-usage.md#connecting-to-a-running-chrome-instance.
-  - **Type:** string
+  Connect to one or more running, debuggable Chrome instances. Format: `url` or `url|start-command`. The start-command is parsed into arguments (POSIX-style quoting) and run WITHOUT a shell when a reconnect is requested (e.g. using `reconnect_browser`) and the browser is not reachable. It may contain a `{url}` placeholder which is replaced by the (sanitized, http/https-only) url passed to `reconnect_browser`. Can be specified multiple times. For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.
+  - **Type:** array
   - **Default:** `false`
 
 - **`--wsEndpoint`/ `--ws-endpoint`, `-w`**
