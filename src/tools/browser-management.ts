@@ -93,13 +93,14 @@ export const listBrowsers = (_args: unknown, browserCount: number) =>
           entry.context
         ) {
           const pages = entry.context.getPages();
-          for (let pageIdx = 0; pageIdx < pages.length; pageIdx++) {
-            const page = pages[pageIdx];
+          for (const page of pages) {
             const selected = entry.context.isPageSelected(page)
               ? ' [selected]'
               : '';
+            // The page's own id, not its position: this is what callers pass
+            // as pageId, and list_pages reports the same number.
             response.appendResponseLine(
-              `    ${pageIdx}: ${page.pptrPage.url()}${selected}`,
+              `    ${page.id}: ${page.pptrPage.url()}${selected}`,
             );
           }
         }

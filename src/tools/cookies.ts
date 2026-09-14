@@ -7,6 +7,11 @@
 import type {CDPSession, Protocol} from '../third_party/index.js';
 
 import {zod} from '../third_party/index.js';
+import {
+  deleteSecrets,
+  placeholderHint,
+  resolvePlaceholders,
+} from '../utils/secrets.js';
 
 import {ToolCategory} from './categories.js';
 import type {ContextPage} from './ToolDefinition.js';
@@ -132,7 +137,11 @@ export const setCookie = definePageTool({
   },
   schema: {
     name: zod.string().describe('The name of the cookie.'),
-    value: zod.string().describe('The value of the cookie.'),
+    value: zod
+      .string()
+      .describe(
+        `The value of the cookie. A cookie value is often a session token, and this parameter is recorded in the conversation transcript, so prefer a placeholder. ${placeholderHint}`,
+      ),
     url: zod
       .string()
       .optional()
@@ -171,17 +180,12 @@ export const setCookie = definePageTool({
   blockedByDialog: false,
   verifyFilesSchema: {},
   handler: async (request, response) => {
-    const {
-      name,
-      value,
-      url,
-      domain,
-      path,
-      expires,
-      httpOnly,
-      secure,
-      sameSite,
-    } = request.params;
+    const {name, url, domain, path, expires, httpOnly, secure, sameSite} =
+      request.params;
+
+    // Resolved here so a session token never has to be passed to this tool.
+    const secret = await resolvePlaceholders(request.params.value);
+    const value = secret.value;
 
     if (!url && !domain) {
       throw new Error(
@@ -208,6 +212,8 @@ export const setCookie = definePageTool({
         `The browser rejected the cookie "${name}". Check that the domain matches the page, and that secure is set when sameSite is "None".`,
       );
     }
+
+    await deleteSecrets(secret.consume);
 
     // The value is deliberately not echoed back.
     response.appendResponseLine(

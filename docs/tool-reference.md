@@ -448,7 +448,7 @@
 
 - **name** (string) **(required)**: The name of the cookie.
 - **pageId** (number) **(required)**: Targets a specific page by ID.
-- **value** (string) **(required)**: The value of the cookie.
+- **value** (string) **(required)**: The value of the cookie. A cookie value is often a session token, and this parameter is recorded in the conversation transcript, so prefer a placeholder. May contain `{{secret:NAME}}`, which is replaced with the contents of ~/.local/share/chrome-devtools-mcp/secrets/NAME by this MCP server just before the input is sent to the browser, so the secret never has to be passed to this tool. Stage such files by reference (e.g. `pass show x > ~/.local/share/chrome-devtools-mcp/secrets/x`), never by writing the literal value. The secret file is DELETED once the call succeeds; append `:keep` (`{{secret:NAME:keep}}`) to keep it for later calls. Append `:raw` (`{{secret:NAME:raw}}`, `{{secret:NAME:raw:keep}}`) to keep a trailing newline. The directory can be relocated with the CHROME_DEVTOOLS_MCP_SECRETS_DIR environment variable. ALWAYS pick a unique, specific NAME (e.g. "github-login-7f3a" rather than "pw"): ~/.local/share/chrome-devtools-mcp/secrets is shared by all MCP servers running in parallel, so a generic name can be overwritten by another session and make you [`fill`](#fill) the wrong value, or be deleted while you still need it.
 - **domain** (string) _(optional)_: The cookie domain, e.g. "example.com" or ".example.com" to include subdomains. Either this or "url" is required.
 - **expires** (number) _(optional)_: Expiry as seconds since the UNIX epoch. Omit to create a session cookie that is dropped when the browser closes.
 - **httpOnly** (boolean) _(optional)_: Whether the cookie is inaccessible to JavaScript.
