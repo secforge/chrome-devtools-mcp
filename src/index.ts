@@ -270,7 +270,10 @@ export class McpServer {
         timeout === undefined ? undefined : {timeout},
       );
       this.#lastClientRoots = result.roots;
-      this.#context?.setRoots(this.#combinedRoots());
+      // Every browser has its own context, and roots are a path restriction:
+      // updating only the selected one would leave the others reachable with
+      // the roots they were created with, after the client narrowed them.
+      this.#applyRootsToAllContexts();
     } catch (e) {
       logger?.('Failed to list roots', e);
     }
@@ -366,6 +369,15 @@ export class McpServer {
           });
       },
     });
+  }
+
+  /** Applies the current roots to every browser's context. */
+  #applyRootsToAllContexts(): void {
+    const roots = this.#combinedRoots();
+    for (const entry of this.registry.getAll()) {
+      entry.context?.setRoots(roots);
+    }
+    this.#context?.setRoots(roots);
   }
 
   async #getContext(browserIndex?: number): Promise<McpContext> {
