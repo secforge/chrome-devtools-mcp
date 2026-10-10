@@ -9,6 +9,11 @@ import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
 import {parseKey} from '../utils/keyboard.js';
 import {logger} from '../utils/logger.js';
+import {
+  deleteSecrets,
+  placeholderHint,
+  resolvePlaceholders,
+} from '../utils/secrets.js';
 import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
@@ -268,6 +273,7 @@ async function selectOption(
   handle: ElementHandle,
   aXNode: TextSnapshotNode,
   value: string,
+  displayValue: string,
   signal: AbortSignal,
 ) {
   let optionFound = false;
@@ -294,7 +300,7 @@ async function selectOption(
     }
   }
   if (!optionFound) {
-    throw new Error(`Could not find option with text "${value}"`);
+    throw new Error(`Could not find option with text "${displayValue}"`);
   }
 }
 
@@ -309,13 +315,15 @@ function hasOptionChildren(aXNode: TextSnapshotNode) {
  * element so the caller can report it without filling remaining elements.
  */
 async function fillFormElements(
-  elements: Array<{uid: string; value: string}>,
+  // `displayValue` is what error messages show: for a value resolved from a
+  // secret it stays the placeholder, so the plaintext is never echoed back.
+  elements: Array<{uid: string; value: string; displayValue: string}>,
   page: ContextPage,
 ): Promise<{result?: WaitForEventsResult; interruptedUid?: string}> {
   let currentUid: string | undefined;
   try {
     const result = await page.waitForEventsAfterAction(async signal => {
-      for (const {uid, value} of elements) {
+      for (const {uid, value, displayValue} of elements) {
         const previousUid = currentUid;
         currentUid = undefined;
         using handle = await raceWithSignal(
@@ -333,7 +341,7 @@ async function fillFormElements(
         // role='combobox' and option children.
         if (aXNode && aXNode.role === 'combobox' && hasOptionChildren(aXNode)) {
           await raceWithSignal(
-            selectOption(handle, aXNode, value, signal),
+            selectOption(handle, aXNode, value, displayValue, signal),
             signal,
           );
         } else {
@@ -355,7 +363,7 @@ async function fillFormElements(
               await handle.asLocator().fill(value === 'true', {signal});
             } else {
               throw new Error(
-                `Checkboxes, radio boxes and toggles require "true" or "false" value, but ${value} was used`,
+                `Checkboxes, radio boxes and toggles require "true" or "false" value, but ${displayValue} was used`,
               );
             }
           } else {
@@ -398,17 +406,25 @@ export const fill = definePageTool(() => ({
     value: zod
       .string()
       .describe(
-        'The value to fill in. "true" or "false" for checkboxes and toggles, "true" for radio buttons.',
+        `The value to fill in. "true" or "false" for checkboxes and toggles, "true" for radio buttons. ${placeholderHint}`,
       ),
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
   verifyFilesSchema: {},
   handler: async (request, response) => {
+    const secret = await resolvePlaceholders(request.params.value);
     const {result} = await fillFormElements(
-      [{uid: request.params.uid, value: request.params.value}],
+      [
+        {
+          uid: request.params.uid,
+          value: secret.value,
+          displayValue: request.params.value,
+        },
+      ],
       request.page,
     );
+    await deleteSecrets(secret.consume);
     if (!result) {
       response.appendResponseLine(
         `The element was filled out and it opened a dialog.`,
@@ -431,21 +447,24 @@ export const typeText = definePageTool(() => ({
     readOnlyHint: false,
   },
   schema: {
-    text: zod.string().describe('The text to type'),
+    text: zod.string().describe(`The text to type. ${placeholderHint}`),
     submitKey: submitKeySchema,
   },
   blockedByDialog: true,
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
+    const typed = await resolvePlaceholders(request.params.text);
     const result = await page.waitForEventsAfterAction(async () => {
-      await page.pptrPage.keyboard.type(request.params.text);
+      await page.pptrPage.keyboard.type(typed.value);
       if (request.params.submitKey) {
         await page.pptrPage.keyboard.press(
           request.params.submitKey as KeyInput,
         );
       }
     });
+    await deleteSecrets(typed.consume);
+    // Echoes the unresolved text so a resolved secret is never reported back.
     response.appendResponseLine(
       `Typed text "${request.params.text}${request.params.submitKey ? ` + ${request.params.submitKey}` : ''}"`,
     );
@@ -503,7 +522,7 @@ export const fillForm = definePageTool(() => ({
             value: zod
               .string()
               .describe(
-                'Value for the element. "true" or "false" for checkboxes and toggles, "true" for radio buttons.',
+                `Value for the element. "true" or "false" for checkboxes and toggles, "true" for radio buttons. ${placeholderHint}`,
               ),
           })
           .describe('An element to fill out'),
@@ -515,10 +534,24 @@ export const fillForm = definePageTool(() => ({
   blockedByDialog: true,
   verifyFilesSchema: {},
   handler: async (request, response) => {
+    const consumable = new Set<string>();
+    const elements = [];
+    for (const element of request.params.elements) {
+      const secret = await resolvePlaceholders(element.value);
+      for (const name of secret.consume) {
+        consumable.add(name);
+      }
+      elements.push({
+        uid: element.uid,
+        value: secret.value,
+        displayValue: element.value,
+      });
+    }
     const {result, interruptedUid} = await fillFormElements(
-      request.params.elements,
+      elements,
       request.page,
     );
+    await deleteSecrets([...consumable]);
     if (!result) {
       // The page is blocked by a dialog, so the remaining elements cannot be
       // filled out until it is handled.

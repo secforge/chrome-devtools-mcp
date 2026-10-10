@@ -308,7 +308,7 @@ export const commands: Commands = {
         name: 'function',
         type: 'string',
         description:
-          'JavaScript source to execute in the target page. Provide either this or sourcePath, but not both. The source is interpreted according to format.\nExample without arguments: `() => document.title` or `async () => await fetch("example.com")`.\nExample with arguments: `(el) => el.innerText`\n',
+          'JavaScript source to execute in the target page. Provide either this or sourcePath, but not both. The source is interpreted according to format.\nExample without arguments: `() => document.title` or `async () => await fetch("example.com")`.\nExample with arguments: `(el) => el.innerText`\nMay contain `{{secret:NAME}}`, which is replaced with the contents of ~/.local/share/chrome-devtools-mcp/secrets/NAME by this MCP server just before the input is sent to the browser, so the secret never has to be passed to this tool. Stage such files by reference (e.g. `pass show x > ~/.local/share/chrome-devtools-mcp/secrets/x`), never by writing the literal value. The secret file is DELETED once the call succeeds; append `:keep` (`{{secret:NAME:keep}}`) to keep it for later calls. Append `:raw` (`{{secret:NAME:raw}}`, `{{secret:NAME:raw:keep}}`) to keep a trailing newline. The directory can be relocated with the CHROME_DEVTOOLS_MCP_SECRETS_DIR environment variable. ALWAYS pick a unique, specific NAME (e.g. "github-login-7f3a" rather than "pw"): ~/.local/share/chrome-devtools-mcp/secrets is shared by all MCP servers running in parallel, so a generic name can be overwritten by another session and make you fill the wrong value, or be deleted while you still need it.\nA file given as \'sourcePath\' may contain the same placeholders; they are resolved after the file is read.\n',
         required: false,
       },
       sourcePath: {
@@ -435,7 +435,7 @@ export const commands: Commands = {
         name: 'value',
         type: 'string',
         description:
-          'The value to fill in. "true" or "false" for checkboxes and toggles, "true" for radio buttons.',
+          'The value to fill in. "true" or "false" for checkboxes and toggles, "true" for radio buttons. May contain `{{secret:NAME}}`, which is replaced with the contents of ~/.local/share/chrome-devtools-mcp/secrets/NAME by this MCP server just before the input is sent to the browser, so the secret never has to be passed to this tool. Stage such files by reference (e.g. `pass show x > ~/.local/share/chrome-devtools-mcp/secrets/x`), never by writing the literal value. The secret file is DELETED once the call succeeds; append `:keep` (`{{secret:NAME:keep}}`) to keep it for later calls. Append `:raw` (`{{secret:NAME:raw}}`, `{{secret:NAME:raw:keep}}`) to keep a trailing newline. The directory can be relocated with the CHROME_DEVTOOLS_MCP_SECRETS_DIR environment variable. ALWAYS pick a unique, specific NAME (e.g. "github-login-7f3a" rather than "pw"): ~/.local/share/chrome-devtools-mcp/secrets is shared by all MCP servers running in parallel, so a generic name can be overwritten by another session and make you fill the wrong value, or be deleted while you still need it.',
         required: true,
       },
       includeSnapshot: {
@@ -1681,7 +1681,8 @@ export const commands: Commands = {
       text: {
         name: 'text',
         type: 'string',
-        description: 'The text to type',
+        description:
+          'The text to type. May contain `{{secret:NAME}}`, which is replaced with the contents of ~/.local/share/chrome-devtools-mcp/secrets/NAME by this MCP server just before the input is sent to the browser, so the secret never has to be passed to this tool. Stage such files by reference (e.g. `pass show x > ~/.local/share/chrome-devtools-mcp/secrets/x`), never by writing the literal value. The secret file is DELETED once the call succeeds; append `:keep` (`{{secret:NAME:keep}}`) to keep it for later calls. Append `:raw` (`{{secret:NAME:raw}}`, `{{secret:NAME:raw:keep}}`) to keep a trailing newline. The directory can be relocated with the CHROME_DEVTOOLS_MCP_SECRETS_DIR environment variable. ALWAYS pick a unique, specific NAME (e.g. "github-login-7f3a" rather than "pw"): ~/.local/share/chrome-devtools-mcp/secrets is shared by all MCP servers running in parallel, so a generic name can be overwritten by another session and make you fill the wrong value, or be deleted while you still need it.',
         required: true,
       },
       submitKey: {
