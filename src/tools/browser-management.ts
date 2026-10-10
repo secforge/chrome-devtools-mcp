@@ -109,7 +109,7 @@ export const listBrowsers = defineTool(() => {
             // The page's own id, not its position: this is what callers pass
             // as pageId, and list_pages reports the same number.
             response.appendResponseLine(
-              `    ${page.id}: ${page.pptrPage.url()}${selected}`,
+              `    ${page.id}: ${page.url()}${selected}`,
             );
           }
         }

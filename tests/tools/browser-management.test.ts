@@ -34,7 +34,7 @@ function fakeBrowser(connected = true): Browser {
 function fakeContextWithPage(url: string): McpContext {
   // Shaped like a real McpPage: list_browsers reports the page's own id and
   // reads the URL through pptrPage, exactly as list_pages does.
-  const page = {id: 1, pptrPage: {url: () => url}};
+  const page = {id: 1, url: () => url, pptrPage: {url: () => url}};
   return {
     getPages: () => [page],
     isPageSelected: () => true,
