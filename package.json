@@ -1,5 +1,5 @@
 {
-  "name": "chrome-devtools-mcp",
+  "name": "@secforge/chrome-devtools-mcp",
   "version": "1.10.1",
   "description": "MCP server for Chrome DevTools",
   "type": "module",
@@ -45,13 +45,13 @@
     "!*.tsbuildinfo",
     "!*.js.map"
   ],
-  "repository": "ChromeDevTools/chrome-devtools-mcp",
+  "repository": "secforge/chrome-devtools-mcp",
   "author": "Google LLC",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/issues"
+    "url": "https://github.com/secforge/chrome-devtools-mcp/issues"
   },
-  "homepage": "https://github.com/ChromeDevTools/chrome-devtools-mcp#readme",
+  "homepage": "https://github.com/secforge/chrome-devtools-mcp#readme",
   "mcpName": "io.github.ChromeDevTools/chrome-devtools-mcp",
   "devDependencies": {
     "@blackwell-systems/gcf": "^2.2.2",
@@ -117,5 +117,8 @@
     "protobufjs": false,
     "unrs-resolver": false,
     "puppeteer": true
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
