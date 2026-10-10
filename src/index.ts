@@ -287,17 +287,6 @@ export class McpServer {
    */
   #registerBrowserConfigs(options: McpServerOptions): void {
     const serverArgs = this.#serverArgs;
-    const mcpContextOptions = {
-      experimentalDevToolsDebugging: serverArgs.experimentalDevtools ?? false,
-      experimentalIncludeAllPages: serverArgs.experimentalIncludeAllPages,
-      performanceCrux: serverArgs.performanceCrux,
-      sourceMaps: serverArgs.sourceMaps,
-      allowlist: serverArgs.allowedUrlPattern,
-      blocklist: serverArgs.blockedUrlPattern,
-      allowUnrestrictedPaths: serverArgs.allowUnrestrictedPaths,
-      categoryExtensions: serverArgs.categoryExtensions,
-    };
-
     const urls = serverArgs.browserUrls ?? [];
     const endpoints = serverArgs.wsEndpoints ?? [];
 
@@ -306,7 +295,6 @@ export class McpServer {
         this.registry.register(
           {
             serverArgs: {...serverArgs, browserUrl: entry.url},
-            mcpContextOptions,
             startCommand: entry.startCommand,
           },
           entry.url,
@@ -320,7 +308,6 @@ export class McpServer {
         this.registry.register(
           {
             serverArgs: {...serverArgs, wsEndpoint: endpoint},
-            mcpContextOptions,
           },
           endpoint,
         );
@@ -333,7 +320,6 @@ export class McpServer {
       options.browserManager,
       {
         serverArgs,
-        mcpContextOptions,
         launched: !serverArgs.browserUrl && !serverArgs.wsEndpoint,
       },
       serverArgs.browserUrl ?? serverArgs.wsEndpoint ?? 'launched',

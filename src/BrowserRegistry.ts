@@ -31,7 +31,6 @@ export interface BrowserConfig {
    * with a manager that is already built.
    */
   serverArgs?: ParsedArguments;
-  mcpContextOptions: McpContextOptions;
   /** Command to start this browser on reconnect if it is not reachable. */
   startCommand?: string;
   /** True when this server launches the browser itself. */
@@ -280,12 +279,7 @@ export class BrowserRegistry {
     manager: BrowserManager,
   ): number {
     this.browsers.push({
-      config: {
-        mcpContextOptions: {
-          experimentalDevToolsDebugging: false,
-          performanceCrux: false,
-        },
-      },
+      config: {},
       manager,
       browser,
       context,

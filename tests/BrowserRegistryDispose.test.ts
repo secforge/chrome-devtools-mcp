@@ -34,10 +34,6 @@ describe('BrowserRegistry.disposeAll', () => {
       manager,
       {
         serverArgs: createMockParsedArguments(),
-        mcpContextOptions: {
-          experimentalDevToolsDebugging: false,
-          performanceCrux: false,
-        },
         launched,
       },
       launched ? 'launched' : 'http://127.0.0.1:9222',

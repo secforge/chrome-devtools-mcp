@@ -21,17 +21,11 @@ import {createMockParsedArguments} from './mocks.js';
 import type {McpContext} from '../src/McpContext.js';
 import type {Browser} from '../src/third_party/index.js';
 
-const mcpContextOptions = {
-  experimentalDevToolsDebugging: false,
-  performanceCrux: false,
-};
-
 function makeConfig(browserURL: string): BrowserConfig {
   // Each entry drives one BrowserManager, built from args narrowed to this
   // single browser.
   return {
     serverArgs: {...createMockParsedArguments(), browserUrl: browserURL},
-    mcpContextOptions,
   };
 }
 

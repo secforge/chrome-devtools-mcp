@@ -160,10 +160,6 @@ describe('browser-management tools', () => {
         r.register(
           {
             serverArgs: {...createMockParsedArguments(), browserUrl: url},
-            mcpContextOptions: {
-              experimentalDevToolsDebugging: false,
-              performanceCrux: false,
-            },
           },
           url,
         );
