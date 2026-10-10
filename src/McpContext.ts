@@ -91,6 +91,12 @@ export class McpContext implements Context {
 
   // Maps LLM-provided isolatedContext name → Puppeteer BrowserContext.
   #isolatedContexts = new Map<string, BrowserContext>();
+  /**
+   * Pages this server opened itself. Only these may be closed when letting go
+   * of a browser that was already running before we connected to it: the
+   * user's own tabs must survive our shutdown.
+   */
+  #pagesOpenedByServer = new Set<Page>();
   // Auto-generated name counter for when no name is provided.
   #nextIsolatedContextId = 1;
 
@@ -153,6 +159,34 @@ export class McpContext implements Context {
     this.browser.on('targetdestroyed', this.#onTargetDestroyed);
   }
 
+  /**
+   * Closes what this server opened - the tabs it created and the isolated
+   * contexts it made - and nothing else. Used when disconnecting from a
+   * browser that was already running, so the user keeps their own tabs.
+   */
+  async closeOwnTargets(): Promise<void> {
+    for (const context of this.#isolatedContexts.values()) {
+      try {
+        await context.close();
+      } catch (error) {
+        this.logger?.('Failed to close isolated context', error);
+      }
+    }
+    this.#isolatedContexts.clear();
+
+    for (const page of this.#pagesOpenedByServer) {
+      if (page.isClosed()) {
+        continue;
+      }
+      try {
+        await page.close({runBeforeUnload: false});
+      } catch (error) {
+        this.logger?.('Failed to close a page opened by the server', error);
+      }
+    }
+    this.#pagesOpenedByServer.clear();
+  }
+
   dispose() {
     this.browser.off('targetcreated', this.#onTargetCreated);
     this.browser.off('targetdestroyed', this.#onTargetDestroyed);
@@ -163,6 +197,7 @@ export class McpContext implements Context {
       mcpPage.dispose();
     }
     this.#mcpPages.clear();
+    this.#pagesOpenedByServer.clear();
     // Isolated contexts are intentionally not closed here.
     // Either the entire browser will be closed or we disconnect
     // without destroying browser state.
@@ -352,6 +387,7 @@ export class McpContext implements Context {
     } else {
       page = await this.browser.newPage({background});
     }
+    this.#pagesOpenedByServer.add(page);
     const mcpPage = await this.#createMcpPage(page);
     await this.createPagesSnapshot();
     this.selectPage(mcpPage);
@@ -366,6 +402,7 @@ export class McpContext implements Context {
       page.dispose();
       this.#mcpPages.delete(page.pptrPage);
     }
+    this.#pagesOpenedByServer.delete(page.pptrPage);
     await page.pptrPage.close({runBeforeUnload: false});
   }
 

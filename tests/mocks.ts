@@ -29,12 +29,14 @@ import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {
+  CdpBrowser,
   CdpExtension,
   CdpFrame,
   CdpPage,
   DevTools,
 } from '../src/third_party/index.js';
 import type {
+  Browser,
   Extension,
   Page,
   Result,
@@ -150,6 +152,16 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
   page._client = sinon.stub().returns(cdpSession);
 
   return page;
+}
+
+export function createMockBrowser(
+  connected = true,
+): sinon.SinonStubbedInstance<Browser> {
+  const browser = sinon.createStubInstance(
+    CdpBrowser,
+  ) as unknown as sinon.SinonStubbedInstance<Browser>;
+  sinon.stub(browser, 'connected').value(connected);
+  return browser;
 }
 
 export function createMockMcpPage(

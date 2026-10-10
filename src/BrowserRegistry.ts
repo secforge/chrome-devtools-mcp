@@ -628,15 +628,29 @@ export class BrowserRegistry {
   /**
    * Dispose all browsers and clear the registry.
    */
+  /**
+   * Only a browser this server launched is ours to close. One that was
+   * already running when we connected to it keeps running: we close the tabs
+   * and isolated contexts we opened in it, then disconnect, so the user's own
+   * windows survive our shutdown.
+   */
   async disposeAll(): Promise<void> {
     logger?.(`Disposing ${this.browsers.length} browsers`);
     for (const entry of this.browsers) {
+      const weLaunchedIt = Boolean(entry.config.launchOptions);
       try {
+        if (entry.context && !weLaunchedIt) {
+          await entry.context.closeOwnTargets();
+        }
         if (entry.context) {
           entry.context.dispose();
         }
         if (entry.browser?.connected) {
-          await entry.browser.close();
+          if (weLaunchedIt) {
+            await entry.browser.close();
+          } else {
+            await entry.browser.disconnect();
+          }
         }
       } catch (error) {
         logger?.(
