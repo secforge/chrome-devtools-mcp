@@ -15,7 +15,51 @@ import {getBrowserOptions} from './browser-options.js';
 import {puppeteerOptions} from './puppeteer-options.js';
 import {toolOptions} from './tool-options.js';
 
+export interface BrowserUrlConfig {
+  url: string;
+  /**
+   * Shell command executed on reconnect (e.g. via `reconnect_browser`) when
+   * the browser is not reachable.
+   */
+  startCommand?: string;
+}
+
 export const mcpOptions = {
+  /**
+   * The fork's multi-browser inputs. Upstream's browserUrl/wsEndpoint stay
+   * single-valued because BrowserManager drives exactly one browser; the
+   * registry builds one manager per entry here.
+   */
+  browserUrls: {
+    type: 'array',
+    description:
+      'Connect to one or more running, debuggable Chrome instances. Format: `url` or `url|start-command`. The start-command is parsed into arguments (POSIX-style quoting) and run WITHOUT a shell when a reconnect is requested and the browser is not reachable. It may contain a `{url}` placeholder, replaced by the sanitized http(s) url passed to reconnect_browser. Can be specified multiple times.',
+    coerce: (values: string[] | undefined): BrowserUrlConfig[] | undefined => {
+      const nonEmpty = (values ?? []).filter(v => v && v.trim() !== '');
+      if (nonEmpty.length === 0) {
+        return;
+      }
+      return nonEmpty.map(value => {
+        const pipeIndex = value.indexOf('|');
+        if (pipeIndex === -1) {
+          return {url: value.trim()};
+        }
+        return {
+          url: value.slice(0, pipeIndex).trim(),
+          startCommand: value.slice(pipeIndex + 1).trim() || undefined,
+        };
+      });
+    },
+  },
+  wsEndpoints: {
+    type: 'array',
+    description:
+      'WebSocket endpoint of one or more running Chrome instances. Can be specified multiple times.',
+    coerce: (values: string[] | undefined): string[] | undefined => {
+      const nonEmpty = (values ?? []).filter(v => v && v.trim() !== '');
+      return nonEmpty.length === 0 ? undefined : nonEmpty;
+    },
+  },
   ...getCategoryOptions(),
   ...getBrowserOptions(),
   ...puppeteerOptions,
