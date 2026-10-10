@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {SECRETS_DIR_DISPLAY} from './utils/secrets.js';
+
 export interface BrowserInstructionInfo {
   /** Human-readable identifier for the browser (its URL, endpoint or label). */
   url: string;
@@ -28,6 +30,23 @@ const CORE_WORKFLOW = [
   '  tools and the emulation tools support debugging.',
 ].join('\n');
 
+const SECRETS = [
+  'Secrets:',
+  '- NEVER pass a password or other secret as literal text to `fill`,',
+  '  `fill_form`, `type_text`, `set_cookie` or `evaluate_script`: tool',
+  '  arguments are recorded in the conversation transcript. Instead stage it',
+  '  by reference (e.g.',
+  `  \`pass show x > ${SECRETS_DIR_DISPLAY}/<name>\`, never \`echo "<literal>"\`)`,
+  '  and pass `{{secret:<name>}}`, which this server substitutes just before',
+  '  the input reaches the browser, so the value never enters the transcript.',
+  '- The secret file is deleted once the call succeeds; append `:keep` to',
+  '  retain it, `:raw` to keep a trailing newline. Pick a unique, specific',
+  `  name - ${SECRETS_DIR_DISPLAY} is shared by all MCP servers running in`,
+  '  parallel.',
+  "- A file passed to evaluate_script's `sourcePath` may carry the same",
+  '  placeholders; they are resolved after the file is read.',
+].join('\n');
+
 /**
  * Describe how a browser can be brought back online, for embedding in a
  * sentence about `reconnect_browser`.
@@ -49,9 +68,12 @@ export function buildServerInstructions(
   browsers: BrowserInstructionInfo[],
 ): string {
   if (browsers.length === 0) {
-    return [INTRO, 'No browsers are currently configured.', CORE_WORKFLOW].join(
-      '\n\n',
-    );
+    return [
+      INTRO,
+      'No browsers are currently configured.',
+      CORE_WORKFLOW,
+      SECRETS,
+    ].join('\n\n');
   }
 
   if (browsers.length === 1) {
@@ -69,6 +91,7 @@ export function buildServerInstructions(
       reconnect +
         ' Use `list_browsers` to see its connection state and open pages.',
       CORE_WORKFLOW,
+      SECRETS,
     ].join('\n\n');
   }
 
@@ -90,5 +113,6 @@ export function buildServerInstructions(
       'and open pages, and `reconnect_browser` to (re)start a browser that has ' +
       'a start command configured (see above).',
     CORE_WORKFLOW,
+    SECRETS,
   ].join('\n\n');
 }
