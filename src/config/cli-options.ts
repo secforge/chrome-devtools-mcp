@@ -144,6 +144,12 @@ export const commands: Commands = {
       },
     },
   },
+  close_browser: {
+    description:
+      'Close the whole browser (not a single tab). The browser window is terminated. reconnect_browser can bring it back if a start command or launch configuration is available.',
+    category: 'Navigation automation',
+    args: {},
+  },
   close_heapsnapshot: {
     description:
       'Closes a previously loaded and cached memory heapsnapshot, freeing its memory. (requires flag: --memoryDebugging=true)',
@@ -1067,6 +1073,12 @@ export const commands: Commands = {
       },
     },
   },
+  list_browsers: {
+    description:
+      'List the connected browser, its connection state and open pages.',
+    category: 'Navigation automation',
+    args: {},
+  },
   list_console_messages: {
     description:
       'List all console messages for the target page since the last navigation. This includes console messages originating from extensions content scripts.',
@@ -1390,6 +1402,33 @@ export const commands: Commands = {
       },
     },
   },
+  press_keys: {
+    description:
+      'Press multiple keys or key combinations in sequence. Use this when you need to perform a series of key presses.',
+    category: 'Input automation',
+    args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
+      keys: {
+        name: 'keys',
+        type: 'array',
+        description:
+          'An array of keys or key combinations to press in sequence',
+        required: true,
+      },
+      includeSnapshot: {
+        name: 'includeSnapshot',
+        type: 'boolean',
+        description:
+          'Whether to include a snapshot in the response. Default is false.',
+        required: false,
+      },
+    },
+  },
   query_heapsnapshot_objects: {
     description:
       'Loads and caches a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, retainedSize, selfSize, isDetached, sortBy). (requires flag: --memoryDebugging=true)',
@@ -1465,6 +1504,20 @@ export const commands: Commands = {
         type: 'integer',
         description:
           'Maximum length of names before truncation. Defaults to 100.',
+        required: false,
+      },
+    },
+  },
+  reconnect_browser: {
+    description:
+      'Reconnect the browser if its connection was lost or it is not running yet. If a start command is configured the browser is (re)started.',
+    category: 'Navigation automation',
+    args: {
+      url: {
+        name: 'url',
+        type: 'string',
+        description:
+          'Absolute http(s) URL the browser should open when it is (re)launched. Substituted into the {url} placeholder of the configured start command. Required when that start command contains a {url} placeholder. Only http and https URLs are accepted.',
         required: false,
       },
     },

@@ -9,8 +9,11 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 import {BrowserManager} from './BrowserManager.js';
+import type {Browser} from './third_party/index.js';
+import {BrowserRegistry} from './BrowserRegistry.js';
 import {type ParsedArguments} from './config/ConfigParser.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
+import {buildServerInstructions} from './server-instructions.js';
 import {McpContext} from './McpContext.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {FilePersistence} from './telemetry/persistence.js';
@@ -59,7 +62,11 @@ export class McpServer {
   readonly server: SdkMcpServer;
   #serverArgs: ParsedArguments;
   #browserManager: BrowserManager;
-  #context?: McpContext;
+  /**
+   * Every configured browser goes through the registry, so one code path
+   * serves both the one- and many-browser cases.
+   */
+  readonly registry: BrowserRegistry;
 
   /**
    * Client roots stay valid across browser reconnects and only the client can
@@ -73,6 +80,13 @@ export class McpServer {
   private constructor(serverArgs: ParsedArguments, options: McpServerOptions) {
     this.#serverArgs = serverArgs;
     this.#browserManager = options.browserManager;
+    this.registry = BrowserRegistry.getInstance();
+    // Registered before the instructions are built, so those can describe the
+    // actual browsers and their indices.
+    this.registry.setContextFactory((browser, reconnected) =>
+      this.#createContext(browser, reconnected),
+    );
+    this.#registerBrowserConfigs(options);
 
     if (this.#serverArgs.usageStatistics) {
       ClearcutLogger.initialize({
@@ -96,6 +110,14 @@ export class McpServer {
         capabilities: {logging: {}, tools: {listChanged: true}},
         // Enabling or updating many tools at once sends a single notification.
         debouncedNotificationMethods: ['notifications/tools/list_changed'],
+        // Describes the browsers that are actually configured, with their
+        // indices, so the model never has to guess which one to target.
+        instructions: buildServerInstructions(
+          this.registry.getAll().map(entry => ({
+            url: entry.url,
+            hasStartCommand: Boolean(entry.config.startCommand),
+          })),
+        ),
       },
     );
 
@@ -175,15 +197,11 @@ export class McpServer {
    * Closes the MCP connection and disposes internal context/listeners.
    */
   async close(): Promise<void> {
-    try {
-      this.#context?.dispose();
-    } catch (err) {
-      logger?.('Failed to dispose context', err);
-    } finally {
-      this.#context = undefined;
-    }
+    // Contexts live on their registry entries; disposeAll() closes the tabs we
+    // opened and then disposes each one.
     await Promise.allSettled([
       this.#browserManager.close(),
+      this.registry.disposeAll(),
       this.server.close(),
     ]);
   }
@@ -208,6 +226,7 @@ export class McpServer {
   }
 
   async #init(): Promise<void> {
+    this.registry.connectAllInBackground();
     for (const tool of createTools(this.#serverArgs)) {
       // Slim and regular tools may share names, only register the current mode.
       if (isAvailableInMode(tool, this.#serverArgs)) {
@@ -250,42 +269,125 @@ export class McpServer {
         timeout === undefined ? undefined : {timeout},
       );
       this.#lastClientRoots = result.roots;
-      this.#context?.setRoots(this.#combinedRoots());
+      // Every browser has its own context, and roots are a path restriction:
+      // updating only the selected one would leave the others reachable with
+      // the roots they were created with, after the client narrowed them.
+      this.#applyRootsToAllContexts();
     } catch (e) {
       logger?.('Failed to list roots', e);
     }
   }
 
-  async #getContext(): Promise<McpContext> {
-    const browser = await this.#browserManager.ensureBrowser();
+  /**
+   * Registers every configured browser without connecting. The server starts
+   * immediately; connections are established lazily and in the background.
+   * A browser given as --browser-url may carry a start command used by
+   * reconnect_browser.
+   */
+  #registerBrowserConfigs(options: McpServerOptions): void {
+    const serverArgs = this.#serverArgs;
+    const urls = serverArgs.browserUrls ?? [];
+    const endpoints = serverArgs.wsEndpoints ?? [];
 
-    if (this.#context?.browser !== browser) {
-      this.#context?.dispose();
-      this.#context = await McpContext.from(browser, logger, {
-        experimentalDevToolsDebugging:
-          this.#serverArgs.experimentalDevtools ?? false,
-        experimentalIncludeAllPages:
-          this.#serverArgs.experimentalIncludeAllPages,
-        performanceCrux: this.#serverArgs.performanceCrux,
-        sourceMaps: this.#serverArgs.sourceMaps,
-        allowlist: this.#serverArgs.allowedUrlPattern,
-        blocklist: this.#serverArgs.blockedUrlPattern,
-        allowUnrestrictedPaths: this.#serverArgs.allowUnrestrictedPaths,
-        // Surfaces a one-time note in the next response after a reconnect.
-        reconnected: this.#context !== undefined,
-        categoryExtensions: this.#serverArgs.categoryExtensions,
-        onNotification: (message: string) => {
-          void this.server
-            .sendLoggingMessage({
-              level: 'info',
-              data: message,
-            })
-            .catch(e => {
-              logger?.('Failed to send MCP notification', e);
-            });
-        },
-      });
-      this.#context.setRoots(this.#combinedRoots());
+    if (urls.length > 0) {
+      for (const entry of urls) {
+        this.registry.register(
+          {
+            serverArgs: {...serverArgs, browserUrl: entry.url},
+            startCommand: entry.startCommand,
+          },
+          entry.url,
+        );
+      }
+      return;
+    }
+
+    if (endpoints.length > 0) {
+      for (const endpoint of endpoints) {
+        this.registry.register(
+          {
+            serverArgs: {...serverArgs, wsEndpoint: endpoint},
+          },
+          endpoint,
+        );
+      }
+      return;
+    }
+
+    // No multi-browser input: the single browser the server was built with.
+    this.registry.addManager(
+      options.browserManager,
+      {
+        serverArgs,
+        launched: !serverArgs.browserUrl && !serverArgs.wsEndpoint,
+      },
+      serverArgs.browserUrl ?? serverArgs.wsEndpoint ?? 'launched',
+    );
+  }
+
+  /**
+   * The one place a context is built. The registry calls this as soon as a
+   * browser connects, so list_browsers can report its pages - with the same
+   * ids page tools resolve - before any other tool has run.
+   */
+  async #createContext(
+    browser: Browser,
+    reconnected: boolean,
+  ): Promise<McpContext> {
+    const context = await await McpContext.from(browser, logger, {
+      experimentalDevToolsDebugging:
+        this.#serverArgs.experimentalDevtools ?? false,
+      experimentalIncludeAllPages: this.#serverArgs.experimentalIncludeAllPages,
+      performanceCrux: this.#serverArgs.performanceCrux,
+      sourceMaps: this.#serverArgs.sourceMaps,
+      allowlist: this.#serverArgs.allowedUrlPattern,
+      blocklist: this.#serverArgs.blockedUrlPattern,
+      allowUnrestrictedPaths: this.#serverArgs.allowUnrestrictedPaths,
+      // Surfaces a one-time note in the next response after a reconnect.
+      // Per browser: whether *this* entry had a context before.
+      reconnected,
+      categoryExtensions: this.#serverArgs.categoryExtensions,
+      onNotification: (message: string) => {
+        void this.server
+          .sendLoggingMessage({
+            level: 'info',
+            data: message,
+          })
+          .catch(e => {
+            logger?.('Failed to send MCP notification', e);
+          });
+      },
+    });
+    // Applied here so no creation path - including the registry's
+    // reconnect factory - can produce a context without path restrictions.
+    context.setRoots(this.#combinedRoots());
+    return context;
+  }
+
+  /** Applies the current roots to every browser's context. */
+  #applyRootsToAllContexts(): void {
+    const roots = this.#combinedRoots();
+    // The registry's entries are the only record of live contexts: a
+    // server-level reference would go stale when close_browser disposes one.
+    for (const entry of this.registry.getAll()) {
+      entry.context?.setRoots(roots);
+    }
+  }
+
+  async #getContext(browserIndex?: number): Promise<McpContext> {
+    const index = this.registry.resolveIndex(browserIndex);
+    const browser = await this.registry.ensureBrowser(index);
+    const entry = this.registry.get(index);
+
+    // One context per browser, kept on its registry entry. Switching browsers
+    // must not dispose the one we are leaving: with several browsers the model
+    // goes back and forth, and a disposed context takes its pages with it.
+    if (entry.context?.browser !== browser) {
+      // Only this entry's own stale context is disposed, when its browser was
+      // replaced by a reconnect.
+      const hadContext = entry.context !== undefined;
+      entry.context?.dispose();
+      entry.context = await this.#createContext(browser, hadContext);
       if (this.#lastClientRoots === undefined) {
         // Nothing listed yet, so this call has to wait – bounded, since it is
         // holding the tool mutex, and a later background refresh still lands
@@ -296,17 +398,18 @@ export class McpServer {
         void this.#updateRoots();
       }
     }
-    return this.#context;
+    return entry.context;
   }
 
   #createToolHandler(tool: ToolDefinition | DefinedPageTool): ToolHandler {
     return new ToolHandler(
       tool,
       this.#serverArgs,
-      () => this.#getContext(),
+      browserIndex => this.#getContext(browserIndex),
       this.#toolMutex,
       browser => this.#browserManager.forget(browser),
       () => this.#browserManager.abandonPendingAttempt(),
+      this.registry.count(),
     );
   }
 

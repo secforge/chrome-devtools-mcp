@@ -55,8 +55,47 @@ export class ConfigParser {
     this.configLocator = new ConfigLocator();
   }
 
+  /**
+   * Routes repeated --browser-url / --ws-endpoint to the fork's multi-valued
+   * options. Upstream's single-valued browserUrl/wsEndpoint keep their types,
+   * which BrowserManager relies on, while the familiar flags still work and
+   * may be given more than once.
+   */
+  static routeMultiBrowserFlags(argv: string[]): string[] {
+    const multi = new Map([
+      ['--browser-url', '--browser-urls'],
+      ['--browserUrl', '--browser-urls'],
+      ['--ws-endpoint', '--ws-endpoints'],
+      ['--wsEndpoint', '--ws-endpoints'],
+    ]);
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const arg of argv) {
+      const eq = arg.indexOf('=');
+      const flag = eq === -1 ? arg : arg.slice(0, eq);
+      const target = multi.get(flag);
+      if (!target || eq === -1) {
+        out.push(arg);
+        continue;
+      }
+      const value = arg.slice(eq + 1);
+      // Every value feeds the fork's multi-valued option...
+      out.push(`${target}=${value}`);
+      // ...and the first plain one also keeps upstream's single-valued option
+      // populated, so its own semantics are unchanged. A value carrying a
+      // start command is ours only: upstream would reject it as a URL.
+      if (!seen.has(target) && !value.includes('|')) {
+        seen.add(target);
+        out.push(arg);
+      }
+    }
+    return out;
+  }
+
   buildCliParser(options: Record<string, YargsOptions> = mcpOptions) {
-    const yargsInstance = yargs(hideBin(this.argv));
+    const yargsInstance = yargs(
+      ConfigParser.routeMultiBrowserFlags(hideBin(this.argv)),
+    );
     return yargsInstance
       .scriptName('npx chrome-devtools-mcp@latest')
       .parserConfiguration({

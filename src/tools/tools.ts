@@ -8,6 +8,7 @@ import type {ParsedArguments} from '../config/ConfigParser.js';
 import {mcpOptions} from '../config/mcp-options.js';
 import type {YargsOptions} from '../third_party/index.js';
 
+import * as browserManagementTools from './browser-management.js';
 import * as commentsTools from './comments.js';
 import * as consoleTools from './console.js';
 import * as cssTools from './css.js';
@@ -31,6 +32,7 @@ import * as webmcpTools from './webmcp.js';
 
 export const createTools = (args: ParsedArguments) => {
   const rawTools = [
+    ...Object.values(browserManagementTools),
     ...Object.values(commentsTools),
     ...Object.values(consoleTools),
     ...Object.values(cssTools),

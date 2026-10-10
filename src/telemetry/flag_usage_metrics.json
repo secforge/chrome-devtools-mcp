@@ -465,5 +465,13 @@
   {
     "name": "file_navigations",
     "flagType": "boolean"
+  },
+  {
+    "name": "browser_urls_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "ws_endpoints_present",
+    "flagType": "boolean"
   }
 ]
