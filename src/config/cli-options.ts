@@ -74,6 +74,39 @@ export const commands: Commands = {
       },
     },
   },
+  clear_cookies: {
+    description:
+      "Deletes cookies from the browser. Pass 'name' and/or 'domain' to delete matching cookies, or 'all' to clear every cookie in the browser. Use this to return to a signed-out or first-visit state.",
+    category: 'Network',
+    args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
+      domain: {
+        name: 'domain',
+        type: 'string',
+        description:
+          'Only delete cookies for this domain and its subdomains, e.g. "example.com" also matches "www.example.com" but not "notexample.com" (case-insensitive).',
+        required: false,
+      },
+      name: {
+        name: 'name',
+        type: 'string',
+        description: 'Only delete cookies with this exact name.',
+        required: false,
+      },
+      all: {
+        name: 'all',
+        type: 'boolean',
+        description:
+          'Set to true to delete EVERY cookie in the browser. This signs the user out of every site, so it is required when no other filter is given, to make a full wipe explicit.',
+        required: false,
+      },
+    },
+  },
   click: {
     description: 'Clicks on the provided element',
     category: 'Input automation',
@@ -308,7 +341,7 @@ export const commands: Commands = {
         name: 'function',
         type: 'string',
         description:
-          'JavaScript source to execute in the target page. Provide either this or sourcePath, but not both. The source is interpreted according to format.\nExample without arguments: `() => document.title` or `async () => await fetch("example.com")`.\nExample with arguments: `(el) => el.innerText`\n',
+          'JavaScript source to execute in the target page. Provide either this or sourcePath, but not both. The source is interpreted according to format.\nExample without arguments: `() => document.title` or `async () => await fetch("example.com")`.\nExample with arguments: `(el) => el.innerText`\nMay contain `{{secret:NAME}}`, which is replaced with the contents of ~/.local/share/chrome-devtools-mcp/secrets/NAME by this MCP server just before the input is sent to the browser, so the secret never has to be passed to this tool. Stage such files by reference (e.g. `pass show x > ~/.local/share/chrome-devtools-mcp/secrets/x`), never by writing the literal value. The secret file is DELETED once the call succeeds; append `:keep` (`{{secret:NAME:keep}}`) to keep it for later calls. Append `:raw` (`{{secret:NAME:raw}}`, `{{secret:NAME:raw:keep}}`) to keep a trailing newline. The directory can be relocated with the CHROME_DEVTOOLS_MCP_SECRETS_DIR environment variable. ALWAYS pick a unique, specific NAME (e.g. "github-login-7f3a" rather than "pw"): ~/.local/share/chrome-devtools-mcp/secrets is shared by all MCP servers running in parallel, so a generic name can be overwritten by another session and make you fill the wrong value, or be deleted while you still need it.\nA file given as \'sourcePath\' may contain the same placeholders; they are resolved after the file is read.\n',
         required: false,
       },
       sourcePath: {
@@ -435,7 +468,7 @@ export const commands: Commands = {
         name: 'value',
         type: 'string',
         description:
-          'The value to fill in. "true" or "false" for checkboxes and toggles, "true" for radio buttons.',
+          'The value to fill in. "true" or "false" for checkboxes and toggles, "true" for radio buttons. May contain `{{secret:NAME}}`, which is replaced with the contents of ~/.local/share/chrome-devtools-mcp/secrets/NAME by this MCP server just before the input is sent to the browser, so the secret never has to be passed to this tool. Stage such files by reference (e.g. `pass show x > ~/.local/share/chrome-devtools-mcp/secrets/x`), never by writing the literal value. The secret file is DELETED once the call succeeds; append `:keep` (`{{secret:NAME:keep}}`) to keep it for later calls. Append `:raw` (`{{secret:NAME:raw}}`, `{{secret:NAME:raw:keep}}`) to keep a trailing newline. The directory can be relocated with the CHROME_DEVTOOLS_MCP_SECRETS_DIR environment variable. ALWAYS pick a unique, specific NAME (e.g. "github-login-7f3a" rather than "pw"): ~/.local/share/chrome-devtools-mcp/secrets is shared by all MCP servers running in parallel, so a generic name can be overwritten by another session and make you fill the wrong value, or be deleted while you still need it.',
         required: true,
       },
       includeSnapshot: {
@@ -464,6 +497,33 @@ export const commands: Commands = {
         description:
           'The msgid of a console message on the page from the listed console messages',
         required: true,
+      },
+    },
+  },
+  get_cookies: {
+    description:
+      "Gets all cookies stored in the browser's default context and writes them, including their values, to a JSON file. The tool reports only which cookies were found (name, domain, and security metadata); cookie values are never returned inline and only exist in the file.",
+    category: 'Network',
+    args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description:
+          'The absolute or relative path to a .json file to write the cookies (including their values) to.',
+        required: true,
+      },
+      domain: {
+        name: 'domain',
+        type: 'string',
+        description:
+          'Only return cookies for this domain and its subdomains, e.g. "example.com" also matches "www.example.com" (case-insensitive). When omitted, returns all cookies.',
+        required: false,
       },
     },
   },
@@ -1559,6 +1619,78 @@ export const commands: Commands = {
       },
     },
   },
+  set_cookie: {
+    description:
+      "Sets a cookie in the browser. Either 'url' or 'domain' must be given. Use this to restore a session, toggle a feature flag, or reproduce a state that depends on a specific cookie.",
+    category: 'Network',
+    args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
+      name: {
+        name: 'name',
+        type: 'string',
+        description: 'The name of the cookie.',
+        required: true,
+      },
+      value: {
+        name: 'value',
+        type: 'string',
+        description:
+          'The value of the cookie. A cookie value is often a session token, and this parameter is recorded in the conversation transcript, so prefer a placeholder. May contain `{{secret:NAME}}`, which is replaced with the contents of ~/.local/share/chrome-devtools-mcp/secrets/NAME by this MCP server just before the input is sent to the browser, so the secret never has to be passed to this tool. Stage such files by reference (e.g. `pass show x > ~/.local/share/chrome-devtools-mcp/secrets/x`), never by writing the literal value. The secret file is DELETED once the call succeeds; append `:keep` (`{{secret:NAME:keep}}`) to keep it for later calls. Append `:raw` (`{{secret:NAME:raw}}`, `{{secret:NAME:raw:keep}}`) to keep a trailing newline. The directory can be relocated with the CHROME_DEVTOOLS_MCP_SECRETS_DIR environment variable. ALWAYS pick a unique, specific NAME (e.g. "github-login-7f3a" rather than "pw"): ~/.local/share/chrome-devtools-mcp/secrets is shared by all MCP servers running in parallel, so a generic name can be overwritten by another session and make you fill the wrong value, or be deleted while you still need it.',
+        required: true,
+      },
+      url: {
+        name: 'url',
+        type: 'string',
+        description:
+          'The request URI to associate the cookie with, which sets its domain and path. Either this or "domain" is required.',
+        required: false,
+      },
+      domain: {
+        name: 'domain',
+        type: 'string',
+        description:
+          'The cookie domain, e.g. "example.com" or ".example.com" to include subdomains. Either this or "url" is required.',
+        required: false,
+      },
+      path: {
+        name: 'path',
+        type: 'string',
+        description: 'The cookie path. Defaults to "/" when a domain is given.',
+        required: false,
+      },
+      expires: {
+        name: 'expires',
+        type: 'number',
+        description:
+          'Expiry as seconds since the UNIX epoch. Omit to create a session cookie that is dropped when the browser closes.',
+        required: false,
+      },
+      httpOnly: {
+        name: 'httpOnly',
+        type: 'boolean',
+        description: 'Whether the cookie is inaccessible to JavaScript.',
+        required: false,
+      },
+      secure: {
+        name: 'secure',
+        type: 'boolean',
+        description: 'Whether the cookie is only sent over HTTPS.',
+        required: false,
+      },
+      sameSite: {
+        name: 'sameSite',
+        type: 'string',
+        description: 'The SameSite policy. "None" requires secure to be true.',
+        required: false,
+        enum: ['Strict', 'Lax', 'None'],
+      },
+    },
+  },
   take_heapsnapshot: {
     description:
       'Capture a heap snapshot of the target page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.',
@@ -1681,7 +1813,8 @@ export const commands: Commands = {
       text: {
         name: 'text',
         type: 'string',
-        description: 'The text to type',
+        description:
+          'The text to type. May contain `{{secret:NAME}}`, which is replaced with the contents of ~/.local/share/chrome-devtools-mcp/secrets/NAME by this MCP server just before the input is sent to the browser, so the secret never has to be passed to this tool. Stage such files by reference (e.g. `pass show x > ~/.local/share/chrome-devtools-mcp/secrets/x`), never by writing the literal value. The secret file is DELETED once the call succeeds; append `:keep` (`{{secret:NAME:keep}}`) to keep it for later calls. Append `:raw` (`{{secret:NAME:raw}}`, `{{secret:NAME:raw:keep}}`) to keep a trailing newline. The directory can be relocated with the CHROME_DEVTOOLS_MCP_SECRETS_DIR environment variable. ALWAYS pick a unique, specific NAME (e.g. "github-login-7f3a" rather than "pw"): ~/.local/share/chrome-devtools-mcp/secrets is shared by all MCP servers running in parallel, so a generic name can be overwritten by another session and make you fill the wrong value, or be deleted while you still need it.',
         required: true,
       },
       submitKey: {
