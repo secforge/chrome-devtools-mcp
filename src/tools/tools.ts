@@ -10,6 +10,7 @@ import type {YargsOptions} from '../third_party/index.js';
 
 import * as commentsTools from './comments.js';
 import * as consoleTools from './console.js';
+import * as cookieTools from './cookies.js';
 import * as cssTools from './css.js';
 import * as emulationTools from './emulation.js';
 import * as extensionTools from './extensions.js';
@@ -33,6 +34,7 @@ export const createTools = (args: ParsedArguments) => {
   const rawTools = [
     ...Object.values(commentsTools),
     ...Object.values(consoleTools),
+    ...Object.values(cookieTools),
     ...Object.values(cssTools),
     ...Object.values(emulationTools),
     ...Object.values(extensionTools),
