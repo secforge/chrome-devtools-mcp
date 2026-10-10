@@ -4,6 +4,14 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 <!-- BEGIN AUTO GENERATED OPTIONS -->
 
+- **`--browserUrls`/ `--browser-urls`**
+  Connect to one or more running, debuggable Chrome instances. Format: `url` or `url|start-command`. The start-command is parsed into arguments (POSIX-style quoting) and run WITHOUT a shell when a reconnect is requested and the browser is not reachable. It may contain a `{url}` placeholder, replaced by the sanitized http(s) url passed to reconnect_browser. Can be specified multiple times.
+  - **Type:** array
+
+- **`--wsEndpoints`/ `--ws-endpoints`**
+  WebSocket endpoint of one or more running Chrome instances. Can be specified multiple times.
+  - **Type:** array
+
 - **`--categoryInput`/ `--category-input`**
   Set to false to exclude tools related to input.
   - **Type:** boolean

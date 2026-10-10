@@ -1320,85 +1320,36 @@
     ]
   },
   {
-    "name": "clear_cookies",
+    "name": "close_browser",
+    "args": []
+  },
+  {
+    "name": "list_browsers",
+    "args": []
+  },
+  {
+    "name": "press_keys",
     "args": [
       {
         "name": "page_id",
         "argType": "number"
       },
       {
-        "name": "domain_length",
+        "name": "keys_count",
         "argType": "number"
       },
       {
-        "name": "name_length",
-        "argType": "number"
-      },
-      {
-        "name": "all",
+        "name": "include_snapshot",
         "argType": "boolean"
       }
     ]
   },
   {
-    "name": "get_cookies",
+    "name": "reconnect_browser",
     "args": [
-      {
-        "name": "page_id",
-        "argType": "number"
-      },
-      {
-        "name": "file_path_length",
-        "argType": "number"
-      },
-      {
-        "name": "domain_length",
-        "argType": "number"
-      }
-    ]
-  },
-  {
-    "name": "set_cookie",
-    "args": [
-      {
-        "name": "page_id",
-        "argType": "number"
-      },
-      {
-        "name": "name_length",
-        "argType": "number"
-      },
-      {
-        "name": "value_length",
-        "argType": "number"
-      },
       {
         "name": "url_length",
         "argType": "number"
-      },
-      {
-        "name": "domain_length",
-        "argType": "number"
-      },
-      {
-        "name": "path_length",
-        "argType": "number"
-      },
-      {
-        "name": "expires",
-        "argType": "number"
-      },
-      {
-        "name": "http_only",
-        "argType": "boolean"
-      },
-      {
-        "name": "secure",
-        "argType": "boolean"
-      },
-      {
-        "name": "same_site",
-        "argType": "string"
       }
     ]
   }
