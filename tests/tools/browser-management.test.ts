@@ -214,7 +214,7 @@ describe('browser-management tools', () => {
       const {response} = makeResponse();
       await assert.rejects(
         () => reconnectBrowser(args).handler({params: {}}, response, noContext),
-        /browserIndex is required when multiple browsers are connected/,
+        /browserIndex parameter is required when multiple browsers are connected/,
       );
     });
   });
@@ -257,7 +257,7 @@ describe('browser-management tools', () => {
       const {response} = makeResponse();
       await assert.rejects(
         () => closeBrowser(args).handler({params: {}}, response, noContext),
-        /browserIndex is required when multiple browsers are connected/,
+        /browserIndex parameter is required when multiple browsers are connected/,
       );
     });
 

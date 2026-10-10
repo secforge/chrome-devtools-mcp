@@ -154,28 +154,16 @@ export const reconnectBrowser = defineTool(() => {
         url?: string;
       };
 
-      // Validate index (same logic as getContext)
-      if (registry.count() === 1) {
-        if (index !== undefined) {
-          throw new Error(
-            'browserIndex must NOT be specified when only one browser is connected.',
-          );
-        }
-        // force=true bypasses cooldown, runStartCommand=true runs the start
-        // command if configured.
-        await registry.connect(1, true, true, url);
-        response.appendResponseLine('Browser reconnected successfully.');
-      } else {
-        if (index === undefined) {
-          throw new Error(
-            'browserIndex is required when multiple browsers are connected.',
-          );
-        }
-        await registry.connect(index, true, true, url);
-        response.appendResponseLine(
-          `Browser ${index} reconnected successfully.`,
-        );
-      }
+      // One validation path for every tool, so the rules cannot drift.
+      const target = registry.resolveIndex(index);
+      // force=true bypasses the cooldown, runStartCommand=true runs the
+      // configured start command when the browser is not reachable.
+      await registry.connect(target, true, true, url);
+      response.appendResponseLine(
+        registry.count() === 1
+          ? 'Browser reconnected successfully.'
+          : `Browser ${target} reconnected successfully.`,
+      );
     },
   };
 });
@@ -202,23 +190,13 @@ export const closeBrowser = defineTool(() => {
       const registry = BrowserRegistry.getInstance();
       const {browserIndex: index} = request.params as {browserIndex?: number};
 
-      if (registry.count() === 1) {
-        if (index !== undefined) {
-          throw new Error(
-            'browserIndex must NOT be specified when only one browser is connected.',
-          );
-        }
-        await registry.dispose(1, true);
-        response.appendResponseLine('Browser closed.');
-      } else {
-        if (index === undefined) {
-          throw new Error(
-            'browserIndex is required when multiple browsers are connected.',
-          );
-        }
-        await registry.dispose(index, true);
-        response.appendResponseLine(`Browser ${index} closed.`);
-      }
+      const target = registry.resolveIndex(index);
+      await registry.dispose(target, true);
+      response.appendResponseLine(
+        registry.count() === 1
+          ? 'Browser closed.'
+          : `Browser ${target} closed.`,
+      );
     },
   };
 });
