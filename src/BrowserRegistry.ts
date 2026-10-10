@@ -457,22 +457,32 @@ export class BrowserRegistry {
    * if necessary. The caller builds its own McpContext from it.
    */
   async ensureBrowser(index?: number): Promise<Browser> {
-    const target = this.resolveIndex(index);
-    const entry = this.get(target);
-    return await entry.manager.ensureBrowser();
+    // Goes through ensureConnected so a browser that just failed is not
+    // retried on every tool call: it keeps its cooldown, and reconnect_browser
+    // remains the way to retry immediately.
+    return await this.ensureConnected(this.resolveIndex(index));
   }
 
   /**
-   * Validates an explicit index, or picks the only browser when omitted.
+   * The single place browserIndex is validated. With one browser the argument
+   * is not offered at all, so passing one is a caller error rather than
+   * something to quietly accept; with several it is required.
    */
   resolveIndex(index?: number): number {
-    if (index === undefined) {
-      if (this.browsers.length > 1) {
+    if (this.browsers.length === 1) {
+      if (index !== undefined) {
         throw new Error(
-          `browserIndex is required when multiple browsers are connected (1-${this.browsers.length}).`,
+          `browserIndex parameter must NOT be specified when only one browser is connected. ` +
+            `Remove the browserIndex parameter from your tool call.`,
         );
       }
       return 1;
+    }
+    if (index === undefined) {
+      throw new Error(
+        `browserIndex parameter is required when multiple browsers are connected. ` +
+          `Use list_browsers to see available browsers (1-${this.browsers.length}).`,
+      );
     }
     if (index < 1 || index > this.browsers.length) {
       throw new Error(
@@ -562,31 +572,6 @@ export class BrowserRegistry {
    * If there are multiple browsers, index MUST be specified.
    * This method will attempt to connect if not already connected.
    */
-  async getBrowser(index?: number): Promise<Browser> {
-    // Single browser case: index must NOT be specified
-    if (this.browsers.length === 1) {
-      if (index !== undefined) {
-        throw new Error(
-          `browserIndex parameter must NOT be specified when only one browser is connected. ` +
-            `Remove the browserIndex parameter from your tool call.`,
-        );
-      }
-      return this.ensureConnected(1);
-    }
-
-    // Multiple browsers case: index is required
-    if (index === undefined) {
-      throw new Error(
-        `browserIndex parameter is required when multiple browsers are connected. ` +
-          `Use list_browsers to see available browsers (1-${this.browsers.length}).`,
-      );
-    }
-
-    const browser = await this.ensureConnected(index);
-    logger?.(`getBrowser(${index}) resolved browser: ${this.get(index).url}`);
-    return browser;
-  }
-
   /**
    * Get all browser entries.
    */

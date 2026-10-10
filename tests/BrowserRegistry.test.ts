@@ -91,21 +91,21 @@ describe('BrowserRegistry', () => {
     it('rejects an explicit index when only one browser exists', async () => {
       const r = BrowserRegistry.getInstance();
       r.register(makeConfig('http://a'), 'http://a');
-      await assert.rejects(() => r.getBrowser(1), /must NOT be specified/);
+      await assert.rejects(() => r.ensureBrowser(1), /must NOT be specified/);
     });
 
     it('requires an index when multiple browsers exist', async () => {
       const r = BrowserRegistry.getInstance();
       r.register(makeConfig('http://a'), 'http://a');
       r.register(makeConfig('http://b'), 'http://b');
-      await assert.rejects(() => r.getBrowser(undefined), /is required/);
+      await assert.rejects(() => r.ensureBrowser(undefined), /is required/);
     });
 
     it('rejects an out-of-bounds index', async () => {
       const r = BrowserRegistry.getInstance();
       r.register(makeConfig('http://a'), 'http://a');
       r.register(makeConfig('http://b'), 'http://b');
-      await assert.rejects(() => r.getBrowser(99), /out of bounds/);
+      await assert.rejects(() => r.ensureBrowser(99), /out of bounds/);
     });
 
     it('returns the browser for the requested index', async () => {
@@ -116,15 +116,15 @@ describe('BrowserRegistry', () => {
       const b2 = fakeBrowser();
       r.addConnectedBrowser(b1, fakeContext(), 'http://a', fakeManager());
       r.addConnectedBrowser(b2, fakeContext(), 'http://b', fakeManager());
-      assert.strictEqual(await r.getBrowser(1), b1);
-      assert.strictEqual(await r.getBrowser(2), b2);
+      assert.strictEqual(await r.ensureBrowser(1), b1);
+      assert.strictEqual(await r.ensureBrowser(2), b2);
     });
 
     it('returns the only browser with no index in single-browser mode', async () => {
       const r = BrowserRegistry.getInstance();
       const browser = fakeBrowser();
       r.addConnectedBrowser(browser, fakeContext(), 'http://a', fakeManager());
-      assert.strictEqual(await r.getBrowser(), browser);
+      assert.strictEqual(await r.ensureBrowser(), browser);
     });
   });
 
@@ -137,7 +137,10 @@ describe('BrowserRegistry', () => {
       entry.lastError = new Error('boom');
       entry.lastAttempt = Date.now();
       assert.strictEqual(r.canRetry(1), false);
-      await assert.rejects(() => r.getBrowser(), /connection failed recently/);
+      await assert.rejects(
+        () => r.ensureBrowser(),
+        /connection failed recently/,
+      );
     });
 
     it('allows retry once the cooldown has elapsed', () => {
