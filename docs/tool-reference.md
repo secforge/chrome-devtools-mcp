@@ -2,7 +2,7 @@
 
 # Chrome DevTools MCP Tool Reference
 
-- **[Input automation](#input-automation)** (10 tools)
+- **[Input automation](#input-automation)** (11 tools)
   - [`click`](#click)
   - [`drag`](#drag)
   - [`fill`](#fill)
@@ -10,14 +10,18 @@
   - [`handle_dialog`](#handle_dialog)
   - [`hover`](#hover)
   - [`press_key`](#press_key)
+  - [`press_keys`](#press_keys)
   - [`type_text`](#type_text)
   - [`upload_file`](#upload_file)
   - [`click_at`](#click_at)
-- **[Navigation automation](#navigation-automation)** (6 tools)
+- **[Navigation automation](#navigation-automation)** (9 tools)
+  - [`close_browser`](#close_browser)
   - [`close_page`](#close_page)
+  - [`list_browsers`](#list_browsers)
   - [`list_pages`](#list_pages)
   - [`navigate_page`](#navigate_page)
   - [`new_page`](#new_page)
+  - [`reconnect_browser`](#reconnect_browser)
   - [`select_page`](#select_page)
   - [`wait_for`](#wait_for)
 - **[Emulation](#emulation)** (2 tools)
@@ -165,6 +169,18 @@
 
 ---
 
+### `press_keys`
+
+**Description:** Press multiple keys or key combinations in sequence. Use this when you need to perform a series of key presses.
+
+**Parameters:**
+
+- **keys** (array) **(required)**: An array of keys or key combinations to press in sequence
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+
+---
+
 ### `type_text`
 
 **Description:** Type text using keyboard into a previously focused input
@@ -206,6 +222,14 @@
 
 ## Navigation automation
 
+### `close_browser`
+
+**Description:** Close the whole browser (not a single tab). The browser window is terminated. [`reconnect_browser`](#reconnect_browser) can bring it back if a start command or launch configuration is available.
+
+**Parameters:** None
+
+---
+
 ### `close_page`
 
 **Description:** Closes the page by its index. The last open page cannot be closed.
@@ -213,6 +237,14 @@
 **Parameters:**
 
 - **pageId** (number) **(required)**: The ID of the page to close. Call [`list_pages`](#list_pages) to list pages.
+
+---
+
+### `list_browsers`
+
+**Description:** List the connected browser, its connection state and open pages.
+
+**Parameters:** None
 
 ---
 
@@ -250,6 +282,16 @@
 - **background** (boolean) _(optional)_: Whether to open the page in the background without bringing it to the front. Default is false (foreground).
 - **isolatedContext** (string) _(optional)_: If specified, the page is created in an isolated browser context with the given name. Pages in the same browser context share cookies and storage. Pages in different browser contexts are fully isolated (useful for clean-slate testing of cookies and authentication).
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
+
+---
+
+### `reconnect_browser`
+
+**Description:** Reconnect the browser if its connection was lost or it is not running yet. If a start command is configured the browser is (re)started.
+
+**Parameters:**
+
+- **url** (string) _(optional)_: Absolute http(s) URL the browser should open when it is (re)launched. Substituted into the {url} placeholder of the configured start command. Required when that start command contains a {url} placeholder. Only http and https URLs are accepted.
 
 ---
 

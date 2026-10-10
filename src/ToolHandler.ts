@@ -20,7 +20,12 @@ import type {
   FileVerificationOption,
   ToolDefinition,
 } from './tools/ToolDefinition.js';
-import {isAvailableInMode, isSlimTool} from './tools/ToolDefinition.js';
+import {
+  isAvailableInMode,
+  isContextFree,
+  isSlimTool,
+  makeBrowserIndexSchema,
+} from './tools/ToolDefinition.js';
 import {logger} from './utils/logger.js';
 import type {Mutex} from './third_party/index.js';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -186,10 +191,11 @@ export class ToolHandler {
   constructor(
     private readonly tool: ToolDefinition | DefinedPageTool,
     private readonly serverArgs: ParsedArguments,
-    private readonly getContext: () => Promise<McpContext>,
+    private readonly getContext: (browserIndex?: number) => Promise<McpContext>,
     private readonly toolMutex: Mutex,
     private readonly forgetBrowserOnTimeout: (browser: Browser) => void,
     private readonly abandonPendingBrowserAttemptOnTimeout: () => void,
+    browserCount = 1,
   ) {
     const {disabled, reason, unavailableInMode} = getToolStatusInfo(
       tool,
@@ -199,7 +205,14 @@ export class ToolHandler {
     this.disabled =
       disabled && (Boolean(unavailableInMode) || !serverArgs.viaCli);
 
-    this.inputSchema = tool.schema;
+    // Inject browserIndex for browser-scoped tools ONLY when more than one
+    // browser is connected. With a single browser it selects implicitly, so
+    // the parameter is omitted entirely (the model cannot pass an invalid
+    // index). Tools that skip the browser context declare their own.
+    this.inputSchema =
+      tool.annotations.skipBrowserContext || browserCount <= 1
+        ? tool.schema
+        : {...makeBrowserIndexSchema(browserCount), ...tool.schema};
     this.registeredInputSchema = zod.object(this.inputSchema).strict();
   }
 
@@ -256,14 +269,26 @@ export class ToolHandler {
       logger?.(
         `${this.tool.name} request: ${JSON.stringify(params, null, '  ')}`,
       );
+      // Tools like list_browsers / reconnect_browser do not operate on a
+      // browser context; they use the BrowserRegistry directly.
+      if (isContextFree(this.tool)) {
+        const response = new McpResponse(this.serverArgs);
+        response.setRedactNetworkHeaders(this.serverArgs.redactNetworkHeaders);
+        await this.tool.handler({params}, response);
+        const content = await response.handleWithoutContext(this.tool.name);
+        success = true;
+        return {content};
+      }
+
+      const browserIndex =
+        typeof params.browserIndex === 'number'
+          ? params.browserIndex
+          : undefined;
       // ensureBrowser() has no cancellation mechanism, so this timeout only
-      // stops us from waiting — the attempt itself keeps running abandoned.
-      // abandonPendingBrowserAttemptOnTimeout() tells BrowserManager to
-      // discard that attempt if it succeeds later instead of handing it to a
-      // subsequent caller — see BrowserManager#abandonPendingAttempt()'s doc
-      // comment for the full mechanism.
-      const context = await this.#raceWithTimeout(this.getContext(), () =>
-        this.abandonPendingBrowserAttemptOnTimeout(),
+      // stops us from waiting - the attempt itself keeps running abandoned.
+      const context = await this.#raceWithTimeout(
+        this.getContext(browserIndex),
+        () => this.abandonPendingBrowserAttemptOnTimeout(),
       );
       logger?.(`${this.tool.name} context: resolved`);
       const response = this.serverArgs.slim

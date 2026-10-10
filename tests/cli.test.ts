@@ -26,6 +26,18 @@ function parseConfig(argv: string[], env: NodeJS.ProcessEnv = {}) {
   ).parse();
 }
 
+/**
+ * The fork adds browserUrls/wsEndpoints. yargs only materialises those keys
+ * when the flags are used, so they are excluded from whole-object snapshots
+ * and asserted on their own where they matter.
+ */
+function withoutMultiBrowserOptions(args: Record<string, unknown>) {
+  const copy = {...args};
+  delete copy['browserUrls'];
+  delete copy['wsEndpoints'];
+  return copy;
+}
+
 describe('cli args parsing', () => {
   const defaultArgs = {
     categoryInput: true,
@@ -65,7 +77,7 @@ describe('cli args parsing', () => {
 
   it('parses with default args', async () => {
     const args = parseConfig([]);
-    assert.deepStrictEqual(args, {
+    assert.deepStrictEqual(withoutMultiBrowserOptions(args), {
       ...defaultArgs,
       channel: 'stable',
     });
@@ -84,7 +96,7 @@ describe('cli args parsing', () => {
 
   it('parses with browser url', async () => {
     const args = parseConfig(['--browserUrl', 'http://localhost:3000']);
-    assert.deepStrictEqual(args, {
+    assert.deepStrictEqual(withoutMultiBrowserOptions(args), {
       ...defaultArgs,
       browserUrl: 'http://localhost:3000',
     });
@@ -112,7 +124,7 @@ describe('cli args parsing', () => {
 
   it('parses with user data dir', async () => {
     const args = parseConfig(['--user-data-dir', '/tmp/chrome-profile']);
-    assert.deepStrictEqual(args, {
+    assert.deepStrictEqual(withoutMultiBrowserOptions(args), {
       ...defaultArgs,
       channel: 'stable',
       userDataDir: '/tmp/chrome-profile',
@@ -121,7 +133,7 @@ describe('cli args parsing', () => {
 
   it('parses an empty browser url', async () => {
     const args = parseConfig(['--browserUrl', ''], {});
-    assert.deepStrictEqual(args, {
+    assert.deepStrictEqual(withoutMultiBrowserOptions(args), {
       ...defaultArgs,
       channel: 'stable',
       browserUrl: undefined,
@@ -130,7 +142,7 @@ describe('cli args parsing', () => {
 
   it('parses with executable path', async () => {
     const args = parseConfig(['--executablePath', '/tmp/test 123/chrome']);
-    assert.deepStrictEqual(args, {
+    assert.deepStrictEqual(withoutMultiBrowserOptions(args), {
       ...defaultArgs,
       executablePath: '/tmp/test 123/chrome',
     });
@@ -138,7 +150,7 @@ describe('cli args parsing', () => {
 
   it('parses viewport', async () => {
     const args = parseConfig(['--viewport', '888x777']);
-    assert.deepStrictEqual(args, {
+    assert.deepStrictEqual(withoutMultiBrowserOptions(args), {
       ...defaultArgs,
       channel: 'stable',
       viewport: {
@@ -153,7 +165,7 @@ describe('cli args parsing', () => {
       `--chrome-arg='--no-sandbox'`,
       `--chrome-arg='--disable-setuid-sandbox'`,
     ]);
-    assert.deepStrictEqual(args, {
+    assert.deepStrictEqual(withoutMultiBrowserOptions(args), {
       ...defaultArgs,
       channel: 'stable',
       chromeArg: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -282,7 +294,7 @@ describe('cli args parsing', () => {
       `--ignore-default-chrome-arg='--disable-extensions'`,
       `--ignore-default-chrome-arg='--disable-cancel-all-touches'`,
     ]);
-    assert.deepStrictEqual(args, {
+    assert.deepStrictEqual(withoutMultiBrowserOptions(args), {
       ...defaultArgs,
       channel: 'stable',
       ignoreDefaultChromeArg: [
@@ -297,7 +309,7 @@ describe('cli args parsing', () => {
       '--wsEndpoint',
       'ws://127.0.0.1:9222/devtools/browser/abc123',
     ]);
-    assert.deepStrictEqual(args, {
+    assert.deepStrictEqual(withoutMultiBrowserOptions(args), {
       ...defaultArgs,
       wsEndpoint: 'ws://127.0.0.1:9222/devtools/browser/abc123',
     });
@@ -308,7 +320,7 @@ describe('cli args parsing', () => {
       '--wsEndpoint',
       'wss://example.com:9222/devtools/browser/abc123',
     ]);
-    assert.deepStrictEqual(args, {
+    assert.deepStrictEqual(withoutMultiBrowserOptions(args), {
       ...defaultArgs,
       wsEndpoint: 'wss://example.com:9222/devtools/browser/abc123',
     });
@@ -329,7 +341,7 @@ describe('cli args parsing', () => {
 
   it('parses disabled category', async () => {
     const args = parseConfig(['--no-category-emulation']);
-    assert.deepStrictEqual(args, {
+    assert.deepStrictEqual(withoutMultiBrowserOptions(args), {
       ...defaultArgs,
       channel: 'stable',
       categoryEmulation: false,
@@ -337,7 +349,7 @@ describe('cli args parsing', () => {
   });
   it('parses auto-connect', async () => {
     const args = parseConfig(['--auto-connect'], {});
-    assert.deepStrictEqual(args, {
+    assert.deepStrictEqual(withoutMultiBrowserOptions(args), {
       ...defaultArgs,
       channel: 'stable',
       autoConnect: true,
