@@ -1,6 +1,6 @@
 {
   "name": "@secforge/chrome-devtools-mcp",
-  "version": "1.10.1003",
+  "version": "1.10.1004",
   "description": "MCP server for Chrome DevTools",
   "type": "module",
   "bin": {
@@ -52,7 +52,7 @@
     "url": "https://github.com/secforge/chrome-devtools-mcp/issues"
   },
   "homepage": "https://github.com/secforge/chrome-devtools-mcp#readme",
-  "mcpName": "io.github.ChromeDevTools/chrome-devtools-mcp",
+  "mcpName": "io.github.secforge/chrome-devtools-mcp",
   "devDependencies": {
     "@blackwell-systems/gcf": "^2.2.2",
     "@eslint/js": "^10.0.1",
