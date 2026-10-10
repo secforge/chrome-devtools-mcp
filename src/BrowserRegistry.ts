@@ -206,9 +206,14 @@ export class BrowserRegistry {
    * Builds the McpContext for a freshly connected browser. Set by McpServer,
    * which owns context creation, so the registry never makes a second one.
    */
-  #contextFactory?: (browser: Browser) => Promise<McpContext>;
+  #contextFactory?: (
+    browser: Browser,
+    reconnected: boolean,
+  ) => Promise<McpContext>;
 
-  setContextFactory(factory: (browser: Browser) => Promise<McpContext>): void {
+  setContextFactory(
+    factory: (browser: Browser, reconnected: boolean) => Promise<McpContext>,
+  ): void {
     this.#contextFactory = factory;
   }
 
@@ -363,6 +368,7 @@ export class BrowserRegistry {
       }
 
       // Dispose old context if exists
+      const hadContext = entry.context !== undefined;
       if (entry.context) {
         entry.context.dispose();
         entry.context = undefined;
@@ -423,7 +429,9 @@ export class BrowserRegistry {
       entry.state = 'connected';
       entry.lastError = undefined;
       if (this.#contextFactory) {
-        entry.context = await this.#contextFactory(browser);
+        // The factory applies the current roots, so a context made here is
+        // restricted exactly like one made for a first connection.
+        entry.context = await this.#contextFactory(browser, hadContext);
       }
 
       logger?.(`Browser ${index} connected successfully`);
