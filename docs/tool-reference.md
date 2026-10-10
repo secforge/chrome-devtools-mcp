@@ -109,7 +109,7 @@
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
-- **value** (string) **(required)**: The value to [`fill`](#fill) in. "true" or "false" for checkboxes and toggles, "true" for radio buttons.
+- **value** (string) **(required)**: The value to [`fill`](#fill) in. "true" or "false" for checkboxes and toggles, "true" for radio buttons. May contain `{{secret:NAME}}`, which is replaced with the contents of ~/.local/share/chrome-devtools-mcp/secrets/NAME by this MCP server just before the input is sent to the browser, so the secret never has to be passed to this tool. Stage such files by reference (e.g. `pass show x > ~/.local/share/chrome-devtools-mcp/secrets/x`), never by writing the literal value. The secret file is DELETED once the call succeeds; append `:keep` (`{{secret:NAME:keep}}`) to keep it for later calls. Append `:raw` (`{{secret:NAME:raw}}`, `{{secret:NAME:raw:keep}}`) to keep a trailing newline. The directory can be relocated with the CHROME_DEVTOOLS_MCP_SECRETS_DIR environment variable. ALWAYS pick a unique, specific NAME (e.g. "github-login-7f3a" rather than "pw"): ~/.local/share/chrome-devtools-mcp/secrets is shared by all MCP servers running in parallel, so a generic name can be overwritten by another session and make you [`fill`](#fill) the wrong value, or be deleted while you still need it.
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
 
 ---
@@ -169,7 +169,7 @@
 **Parameters:**
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
-- **text** (string) **(required)**: The text to type
+- **text** (string) **(required)**: The text to type. May contain `{{secret:NAME}}`, which is replaced with the contents of ~/.local/share/chrome-devtools-mcp/secrets/NAME by this MCP server just before the input is sent to the browser, so the secret never has to be passed to this tool. Stage such files by reference (e.g. `pass show x > ~/.local/share/chrome-devtools-mcp/secrets/x`), never by writing the literal value. The secret file is DELETED once the call succeeds; append `:keep` (`{{secret:NAME:keep}}`) to keep it for later calls. Append `:raw` (`{{secret:NAME:raw}}`, `{{secret:NAME:raw:keep}}`) to keep a trailing newline. The directory can be relocated with the CHROME_DEVTOOLS_MCP_SECRETS_DIR environment variable. ALWAYS pick a unique, specific NAME (e.g. "github-login-7f3a" rather than "pw"): ~/.local/share/chrome-devtools-mcp/secrets is shared by all MCP servers running in parallel, so a generic name can be overwritten by another session and make you [`fill`](#fill) the wrong value, or be deleted while you still need it.
 - **submitKey** (string) _(optional)_: Optional key to press after typing. E.g., "Enter", "Tab", "Escape"
 
 ---
@@ -387,6 +387,8 @@
 - **function** (string) _(optional)_: JavaScript source to execute in the target page. Provide either this or sourcePath, but not both. The source is interpreted according to format.
   Example without arguments: `() => document.title` or `async () => await fetch("example.com")`.
   Example with arguments: `(el) => el.innerText`
+  May contain `{{secret:NAME}}`, which is replaced with the contents of ~/.local/share/chrome-devtools-mcp/secrets/NAME by this MCP server just before the input is sent to the browser, so the secret never has to be passed to this tool. Stage such files by reference (e.g. `pass show x > ~/.local/share/chrome-devtools-mcp/secrets/x`), never by writing the literal value. The secret file is DELETED once the call succeeds; append `:keep` (`{{secret:NAME:keep}}`) to keep it for later calls. Append `:raw` (`{{secret:NAME:raw}}`, `{{secret:NAME:raw:keep}}`) to keep a trailing newline. The directory can be relocated with the CHROME_DEVTOOLS_MCP_SECRETS_DIR environment variable. ALWAYS pick a unique, specific NAME (e.g. "github-login-7f3a" rather than "pw"): ~/.local/share/chrome-devtools-mcp/secrets is shared by all MCP servers running in parallel, so a generic name can be overwritten by another session and make you [`fill`](#fill) the wrong value, or be deleted while you still need it.
+  A file given as 'sourcePath' may contain the same placeholders; they are resolved after the file is read.
 
 - **sourcePath** (string) _(optional)_: The absolute or relative path to a JavaScript file on the MCP server's local filesystem. Provide either this or function, but not both.
 - **waitForStableDom** (boolean) _(optional)_: Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.
